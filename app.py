@@ -2,7 +2,7 @@ import math
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import altair as alt
 import pandas as pd
@@ -315,7 +315,7 @@ def upload_panel(
     help_hint: str,
     key_prefix: str,
     default_header: bool = False,
-) -> tuple[Optional[Any], bool, Optional[int], Optional[int]]:
+) -> tuple[Any | None, bool, int | None, int | None]:
     """Shared UI for file upload + optional header + column choices.
 
     Returns
@@ -336,8 +336,8 @@ def upload_panel(
     has_header = st.checkbox(
         f"{key_prefix.capitalize()} file has header row", value=default_header, key=f"{key_prefix}_has_header"
     )
-    date_sel: Optional[int] = 0
-    count_sel: Optional[int] = 1
+    date_sel: int | None = 0
+    count_sel: int | None = 1
     if file_obj is not None:
         try:
             head = read_head_preview(file_obj, has_header, nrows=5)
@@ -1493,7 +1493,7 @@ def _to_monthly_last(s: pd.Series | None) -> pd.Series | None:
     return s.resample("ME").last()
 
 
-def _build_plot_df(all_series: Optional[pd.Series], paid_series: Optional[pd.Series]) -> pd.DataFrame:
+def _build_plot_df(all_series: pd.Series | None, paid_series: pd.Series | None) -> pd.DataFrame:
     plot_df = pd.DataFrame()
     if all_series is not None and not all_series.empty:
         plot_df["Total"] = all_series
@@ -1506,7 +1506,7 @@ def _build_plot_df(all_series: Optional[pd.Series], paid_series: Optional[pd.Ser
     return plot_df
 
 
-def _safe_select_columns(head: pd.DataFrame, key_prefix: str) -> tuple[Optional[int], Optional[int]]:
+def _safe_select_columns(head: pd.DataFrame, key_prefix: str) -> tuple[int | None, int | None]:
     ncols = head.shape[1]
     if ncols < 2:
         st.error(f"{key_prefix.capitalize()} file needs at least 2 columns (date, count).")
@@ -1526,9 +1526,7 @@ def _safe_select_columns(head: pd.DataFrame, key_prefix: str) -> tuple[Optional[
     return date_sel, count_sel
 
 
-def _ui_upload_two_files() -> (
-    tuple[Optional[Any], bool, Optional[int], Optional[int], Optional[Any], bool, Optional[int], Optional[int]]
-):
+def _ui_upload_two_files() -> tuple[Any | None, bool, int | None, int | None, Any | None, bool, int | None, int | None]:
     logger.info("Uploading two files")
     c_all, c_paid = st.columns(2)
     with c_all:
