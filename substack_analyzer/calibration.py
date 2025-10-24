@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ class PiecewiseLogisticFit:
     residuals: pd.Series
     sse: float
     r2_on_deltas: float
-    gamma_exog: Optional[float] = None
+    gamma_exog: float | None = None
     gamma_intercept: float = 0.0
 
 
@@ -45,7 +45,7 @@ def _segments_from_breakpoints(n: int, breakpoints: Sequence[int]) -> list[tuple
     return segments
 
 
-def _event_regressors(index: pd.DatetimeIndex, events_df: Optional[pd.DataFrame]) -> tuple[np.ndarray, np.ndarray]:
+def _event_regressors(index: pd.DatetimeIndex, events_df: pd.DataFrame | None) -> tuple[np.ndarray, np.ndarray]:
     if events_df is None or events_df.empty:
         return np.zeros(len(index)), np.zeros(len(index))
     df = events_df.dropna(subset=["date"]).copy()
@@ -74,9 +74,9 @@ def _event_regressors(index: pd.DatetimeIndex, events_df: Optional[pd.DataFrame]
 def fit_piecewise_logistic(
     total_series: pd.Series,
     breakpoints: list[int],
-    events_df: Optional[pd.DataFrame] = None,
-    k_grid: Optional[Sequence[float]] = None,
-    extra_exog: Optional[pd.Series] = None,
+    events_df: pd.DataFrame | None = None,
+    k_grid: Sequence[float] | None = None,
+    extra_exog: pd.Series | None = None,
 ) -> PiecewiseLogisticFit:
     """Fit a piecewise-logistic model on monthly totals via grid-search over K and OLS.
 
@@ -133,7 +133,7 @@ def fit_piecewise_logistic(
             ]
         )
 
-    best: Optional[PiecewiseLogisticFit] = None
+    best: PiecewiseLogisticFit | None = None
     best_sse = np.inf
 
     # Precompute Δ-space segment masks for efficiency and stability
@@ -254,12 +254,12 @@ def fitted_series_from_params(
     breakpoints: list[int],
     carrying_capacity: float,
     segment_growth_rates: Sequence[float],
-    events_df: Optional[pd.DataFrame] = None,
-    extra_exog: Optional[pd.Series] = None,
+    events_df: pd.DataFrame | None = None,
+    extra_exog: pd.Series | None = None,
     gamma_pulse: float = 0.0,
     gamma_step: float = 0.0,
-    gamma_exog: Optional[float] = None,
-    gamma_intercept: Optional[float] = None,
+    gamma_exog: float | None = None,
+    gamma_intercept: float | None = None,
 ) -> pd.Series:
     """
     This takes the parameters and uses uses them to predict the future.
