@@ -18,7 +18,7 @@ from substack_analyzer.analysis import (
     read_series,
 )
 from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_from_params, forecast_piecewise_logistic
-from substack_analyzer.changepoints import breakpoints_for_segments, breakpoints_to_events, detect_and_classify
+from substack_analyzer.changepoints import breakpoints_to_events, detect_and_classify
 from substack_analyzer.detection import compute_segment_slopes, slope_around
 from substack_analyzer.model import simulate_growth
 from substack_analyzer.persistence import apply_session_bundle, collect_session_bundle
@@ -503,12 +503,48 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             )
                             st.session_state["events_df"] = _clean_events_df(merged_all)
 
-                        # Segment breakpoints from merged classified
-                        seg_bkps = breakpoints_for_segments(merged_classified)
+                        # Segment breakpoints from merged classified, with consolidation across series when needed
+                        def _merge_month_end_dates(
+                            dates: list[pd.Timestamp],
+                            min_gap_months: int = 1,
+                        ) -> list[pd.Timestamp]:
+                            if not dates:
+                                return []
+                            ds = sorted({pd.to_datetime(d).to_period("M").to_timestamp("M") for d in dates})
+                            merged: list[pd.Timestamp] = []
+                            for d in ds:
+                                if not merged:
+                                    merged.append(d)
+                                else:
+                                    prev = merged[-1]
+                                    if (d.to_period("M").ordinal - prev.to_period("M").ordinal) >= min_gap_months:
+                                        merged.append(d)
+                            return merged
+
+                        seg_effects = [
+                            b
+                            for b in merged_classified
+                            if (b.effect == "Persistent" and b.component in {"rate", "mixed"})
+                        ]
+
+                        if detect_mode.startswith("Both"):
+                            # Merge by month-end to avoid double-counting near-duplicate breaks across Total/Paid
+                            merged_dates = _merge_month_end_dates([b.date for b in seg_effects], min_gap_months=1)
+                            base_index = (
+                                plot_df["Total"].dropna().index
+                                if "Total" in plot_df.columns
+                                else (plot_df["Paid"].dropna().index if "Paid" in plot_df.columns else plot_df.index)
+                            )
+                            seg_bkps = [base_index.get_loc(d) for d in merged_dates if d in base_index]
+                            seg_bkps = sorted(set(seg_bkps))
+                            st.session_state["detected_change_dates"] = merged_dates
+                        else:
+                            # Single-series path: detector already de-dupes within-series; just map indices→dates
+                            seg_bkps = sorted(set(b.index for b in seg_effects))
+                            s_idx = plot_df[target_col].dropna().index if target_col is not None else plot_df.index
+                            st.session_state["detected_change_dates"] = [s_idx[i] for i in seg_bkps if i < len(s_idx)]
+
                         st.session_state["detected_breakpoints"] = seg_bkps
-                        # map indices to dates using Total if present else index
-                        s_idx = plot_df["Total"].dropna().index if "Total" in plot_df.columns else plot_df.index
-                        st.session_state["detected_change_dates"] = [s_idx[i] for i in seg_bkps if i < len(s_idx)]
                         # Save a human-readable label of what we detected on
                         if detect_mode.startswith("Both"):
                             st.session_state["detected_target_label"] = "Total+Paid"

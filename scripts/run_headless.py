@@ -74,6 +74,7 @@ def run(
     events_path: str | None,
     adspend_path: str | None,
     max_changes: int,
+    detect_on: str,
     lam: float,
     theta: float,
     out_dir: str,
@@ -122,7 +123,6 @@ def run(
         plot_df["Free"] = (plot_df["Total"].astype(float) - plot_df["Paid"].astype(float)).clip(lower=0)
 
     # Detection target selection and optional merge
-    detect_on = str(getattr(run, "detect_on", getattr(st.session_state, "detect_on", "auto"))).lower()
 
     def _detect_indices(series: pd.Series) -> list[int]:
         return detect_change_points(series.dropna(), max_changes=max_changes, min_seg_len=3, return_mode="indices")
@@ -148,11 +148,11 @@ def run(
 
     # Choose detection according to mode
     bkps: list[int] = []
-    detect_mode = os.environ.get("DETECT_ON", detect_on)
+    detect_mode = detect_on.lower()
     # Default base for mapping indices in fit
     fit_series = plot_df["Total"] if "Total" in plot_df.columns else plot_df.get("Paid", plot_df.iloc[:, 0])
 
-    if detect_mode in ("auto", "default"):
+    if detect_mode in {"auto", "default"}:
         target = (
             plot_df["Total"]
             if "Total" in plot_df.columns
@@ -185,7 +185,7 @@ def run(
         d_paid = _indices_to_dates(plot_df["Paid"], b_paid)
         d_merged = _merge_dates(d_total + d_paid, min_gap_months=1)
         base_index = plot_df["Total"].dropna().index if "Total" in plot_df.columns else plot_df["Paid"].dropna().index
-        bkps = [int(base_index.get_loc(d)) for d in d_merged if d in base_index]
+        bkps = [base_index.get_loc(d) for d in d_merged if d in base_index]
         # Keep bkps sorted and unique
         bkps = sorted(set(bkps))
     else:
@@ -278,9 +278,6 @@ def main() -> None:
 
     args = p.parse_args()
 
-    # Attach detect mode to run function for internal use
-    setattr(run, "detect_on", args.detect_on)
-
     run(
         all_path=args.all_path,
         all_has_header=args.all_has_header,
@@ -293,6 +290,7 @@ def main() -> None:
         events_path=args.events_path,
         adspend_path=args.adspend_path,
         max_changes=args.max_changes,
+        detect_on=args.detect_on,
         lam=args.lam,
         theta=args.theta,
         out_dir=args.out_dir,

@@ -35,7 +35,9 @@
                 "--theta",
                 "500",
                 "--out-dir",
-                "/Users/julius/git/substack-analyzer/outputs"
+                "/Users/julius/git/substack-analyzer/outputs",
+                "--detect-on",
+                "both"
             ]
         },
         {
