@@ -89,7 +89,7 @@ def _clean_events_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _event_rules_from_events() -> Optional[alt.Chart]:
+def _event_rules_from_events() -> alt.Chart | None:
     logger.info("_event_rules_from_events has been called")
     ev = st.session_state.get("events_df")
     logger.info(f"ev: {ev}")
@@ -393,7 +393,7 @@ def emit_observations(plot_df: pd.DataFrame) -> None:
         )
 
 
-def trend_detection_ui(plot_df: pd.DataFrame, target_col: Optional[str]) -> list[int]:
+def trend_detection_ui(plot_df: pd.DataFrame, target_col: str | None) -> list[int]:
     st.caption("Detection runs when you click the Events button above.")
     if target_col is None:
         return []
@@ -411,7 +411,7 @@ def trend_detection_ui(plot_df: pd.DataFrame, target_col: Optional[str]) -> list
     return bkps
 
 
-def events_editor(plot_df: pd.DataFrame, target_col: Optional[str]) -> None:
+def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
     st.subheader("Stage 2: Events & annotations")
     st.caption("Track shout-outs, ad campaigns, launches, etc. Dates must match the series timeline.")
 
@@ -1473,21 +1473,19 @@ def render_save_load() -> None:
                 st.error(f"Failed to load bundle: {e}")
 
 
-def _compute_estimates(
-    all_series: Optional[pd.Series], paid_series: Optional[pd.Series], window_months: int = 6
-) -> dict:
+def _compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | None, window_months: int = 6) -> dict:
     return compute_estimates(all_series, paid_series, window_months)
 
 
 @dataclass
 class ImportContext:
-    all_series: Optional[pd.Series]
-    paid_series: Optional[pd.Series]
+    all_series: pd.Series | None
+    paid_series: pd.Series | None
     plot_df: pd.DataFrame
     net_only: bool
 
 
-def _to_monthly_last(s: Optional[pd.Series]) -> Optional[pd.Series]:
+def _to_monthly_last(s: pd.Series | None) -> pd.Series | None:
     if s is None or s.empty:
         return s
     s2 = pd.to_datetime(pd.Index(s.index), errors="coerce")
@@ -1617,7 +1615,7 @@ def _ui_series_chart(plot_df: pd.DataFrame) -> tuple[bool, bool]:
     return use_dual_axis, show_total
 
 
-def _stage2_events_and_detection(plot_df: pd.DataFrame) -> tuple[list[int], Optional[str]]:
+def _stage2_events_and_detection(plot_df: pd.DataFrame) -> tuple[list[int], str | None]:
     target_col = "Total" if "Total" in plot_df.columns else ("Free" if "Free" in plot_df.columns else None)
     events_editor(plot_df, target_col)
     # Map Change events to breakpoints; show detected as reference only
@@ -1633,7 +1631,7 @@ def _stage2_events_and_detection(plot_df: pd.DataFrame) -> tuple[list[int], Opti
 
 
 def _stage5_tail(
-    plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, target_col: Optional[str], breakpoints: list[int]
+    plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, target_col: str | None, breakpoints: list[int]
 ) -> None:
     tail_view_ui(plot_df, use_dual_axis, show_total, target_col, breakpoints)
 
