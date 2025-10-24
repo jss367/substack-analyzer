@@ -68,10 +68,6 @@ def _event_regressors(index: pd.DatetimeIndex, events_df: Optional[pd.DataFrame]
             elif persistence == "transient":
                 # Pulse at the event month (always weight by cost if available)
                 pulse[i] += weight
-            else:
-                # Backward-compatibility: both (weight pulse by cost if provided)
-                pulse[i] += weight
-                step[index >= when] += weight
     return pulse, step
 
 

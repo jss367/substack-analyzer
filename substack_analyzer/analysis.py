@@ -252,8 +252,6 @@ def build_events_features(plot_df: pd.DataFrame, lam: float, theta: float, ad_fi
     Notes
     -----
     - Event dates falling outside the monthly index are ignored.
-    - If an event's persistence is unspecified, it contributes to both `pulse`
-      and `step` for backward compatibility. #TODO: Undo this
     - All outputs are float-valued and aligned to the month-end index.
     """
     monthly_index = plot_df.index
@@ -279,10 +277,6 @@ def build_events_features(plot_df: pd.DataFrame, lam: float, theta: float, ad_fi
                 step.loc[d:] += 1.0
             elif persistence == "transient":
                 pulse.loc[d] += float(weight)
-            else:
-                # Backward-compatibility: if unspecified, treat as both
-                pulse.loc[d] += float(weight)
-                step.loc[d:] += 1.0
 
     ad_spend = pd.Series(0.0, index=monthly_index, name="ad_spend")
     if ad_file is not None:
