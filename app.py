@@ -297,11 +297,6 @@ if LOGO_FULL.exists() or LOGO_ICON.exists():
     st.sidebar.image(str(LOGO_FULL if LOGO_FULL.exists() else LOGO_ICON), width="stretch")
 
 
-def _format_date_badges(dates: list[pd.Timestamp | str]) -> str:
-    # Backward-compatible wrapper delegating to ui helper
-    return ui_format_date_badges(dates)
-
-
 def read_head_preview(fh, has_header: bool, nrows: int = 5) -> pd.DataFrame:
     """Read a small preview from an uploaded CSV/XLSX without consuming the file pointer."""
     try:
@@ -411,7 +406,7 @@ def trend_detection_ui(plot_df: pd.DataFrame, target_col: Optional[str]) -> list
         s_idx = plot_df[target_col].dropna().index
         dates = [pd.to_datetime(s_idx[i]) for i in bkps if i < len(s_idx)]
         st.markdown(f"**Detected change dates (on {target_col}):**")
-        st.markdown(_format_date_badges(dates), unsafe_allow_html=True)
+        st.markdown(ui_format_date_badges(dates), unsafe_allow_html=True)
     return bkps
 
 
