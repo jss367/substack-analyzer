@@ -28,6 +28,7 @@ import streamlit as st
 from substack_analyzer.analysis import build_events_features, compute_estimates, read_series
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.detection import detect_change_points
+from substack_analyzer.utils import ensure_month_end_index
 
 
 def _open_file(path: Optional[str]) -> Optional[object]:
@@ -62,13 +63,6 @@ def _read_events_csv(path: Optional[str]) -> pd.DataFrame:
     return out
 
 
-def _ensure_month_end_index(s: pd.Series) -> pd.Series:
-    s = s.copy()
-    s.index = pd.to_datetime(s.index).to_period("M").to_timestamp("M")
-    s = s.sort_index()
-    return s
-
-
 def run(
     all_path: Optional[str],
     all_has_header: bool,
@@ -93,11 +87,11 @@ def run(
     if all_path:
         with _open_file(all_path) as f_all:
             total = read_series(f_all, all_has_header, all_date_col, all_count_col)
-            total = _ensure_month_end_index(total)
+            total = ensure_month_end_index(total)
     if paid_path:
         with _open_file(paid_path) as f_paid:
             paid = read_series(f_paid, paid_has_header, paid_date_col, paid_count_col)
-            paid = _ensure_month_end_index(paid)
+            paid = ensure_month_end_index(paid)
 
     if total is None and paid is None:
         raise SystemExit("Provide at least one of --all or --paid")

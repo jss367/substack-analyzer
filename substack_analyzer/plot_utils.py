@@ -8,7 +8,8 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from substack_analyzer.calibration import PiecewiseLogisticFit, _ensure_month_end_index
+from substack_analyzer.calibration import PiecewiseLogisticFit
+from substack_analyzer.utils import ensure_month_end_index
 
 
 def plot_fit_vs_actual(
@@ -40,7 +41,7 @@ def plot_fit_vs_actual(
         The Axes object for further customization.
     """
 
-    actual = _ensure_month_end_index(input_series).astype(float)
+    actual = ensure_month_end_index(input_series).astype(float)
     fitted = fit.fitted_series.reindex(actual.index).astype(float)
 
     if title is None:
