@@ -492,6 +492,13 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
 
                         # De-duplicate events and store
                         if merged_events_df is not None and not merged_events_df.empty:
+                            # When detecting on both series, collapse duplicates by (date, persistence)
+                            # to avoid two rows for the same month stemming from Total vs Paid.
+                            if detect_mode.startswith("Both"):
+                                merged_events_df = merged_events_df.sort_values("date")
+                                merged_events_df = merged_events_df.drop_duplicates(
+                                    subset=["date", "persistence"], keep="first"
+                                )
                             merged_events_df = merged_events_df.drop_duplicates(
                                 subset=["date", "type", "notes"], keep="first"
                             )
@@ -501,7 +508,12 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                                 if not base.empty
                                 else merged_events_df
                             )
-                            st.session_state["events_df"] = _clean_events_df(merged_all)
+                            # Also de-duplicate across the combined table to collapse prior duplicates
+                            cleaned_all = _clean_events_df(merged_all)
+                            if detect_mode.startswith("Both") and not cleaned_all.empty:
+                                cleaned_all = cleaned_all.sort_values("date")
+                                cleaned_all = cleaned_all.drop_duplicates(subset=["date", "persistence"], keep="first")
+                            st.session_state["events_df"] = cleaned_all
 
                         # Segment breakpoints from merged classified, with consolidation across series when needed
                         def _merge_month_end_dates(

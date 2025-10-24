@@ -260,6 +260,10 @@ def build_events_features(plot_df: pd.DataFrame, lam: float, theta: float, ad_fi
         ev2 = ev_src.dropna(subset=["date"]).copy()
         with suppress(Exception):
             ev2["date"] = pd.to_datetime(ev2["date"]).dt.to_period("M").dt.to_timestamp("M")
+        # Collapse duplicates so pulses/steps are not double-counted if the UI contains
+        # multiple entries for the same month and persistence (e.g., from Total & Paid).
+        ev2 = ev2.sort_values("date")
+        ev2 = ev2.drop_duplicates(subset=["date", "persistence"], keep="first")
         for _, r in ev2.iterrows():
             d = r.get("date")
             if pd.isna(d) or d not in monthly_index:
