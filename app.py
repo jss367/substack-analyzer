@@ -394,7 +394,7 @@ def emit_observations(plot_df: pd.DataFrame) -> None:
 
 
 def trend_detection_ui(plot_df: pd.DataFrame, target_col: Optional[str]) -> list[int]:
-    st.caption("Detection runs only when you click the Events button above.")
+    st.caption("Detection runs when you click the Events button above.")
     if target_col is None:
         return []
     # Let users choose detection sensitivity ahead of time; used when button is clicked.
@@ -405,7 +405,8 @@ def trend_detection_ui(plot_df: pd.DataFrame, target_col: Optional[str]) -> list
     if bkps:
         s_idx = plot_df[target_col].dropna().index
         dates = [pd.to_datetime(s_idx[i]) for i in bkps if i < len(s_idx)]
-        st.markdown(f"**Detected change dates (on {target_col}):**")
+        used = st.session_state.get("detected_target_label", target_col)
+        st.markdown(f"**Detected change dates (on {used}):**")
         st.markdown(ui_format_date_badges(dates), unsafe_allow_html=True)
     return bkps
 
@@ -413,6 +414,18 @@ def trend_detection_ui(plot_df: pd.DataFrame, target_col: Optional[str]) -> list
 def events_editor(plot_df: pd.DataFrame, target_col: Optional[str]) -> None:
     st.subheader("Stage 2: Events & annotations")
     st.caption("Track shout-outs, ad campaigns, launches, etc. Dates must match the series timeline.")
+
+    # Detection mode selector
+    detect_mode = st.selectbox(
+        "Detection target",
+        ["Auto (Total→Free)", "Total", "Free", "Paid", "Both (Total+Paid)"],
+        index=0,
+        help=(
+            "Choose which series to run change-point detection on. "
+            "Auto prefers Total (or Free if Total unavailable). Both will detect on Total and Paid and merge."
+        ),
+        key="detect_on",
+    )
 
     # Add detected change dates
     with st.container():
@@ -422,25 +435,87 @@ def events_editor(plot_df: pd.DataFrame, target_col: Optional[str]) -> None:
                 if target_col is None:
                     st.info("No target series selected for detection.")
                 else:
-                    s = plot_df[target_col].dropna()
-                    bps = detect_and_classify(
-                        s,
-                        max_changes=int(st.session_state.get("max_changes_detect", 3)),
-                        window=6,
-                    )
-                    if not bps:
+                    max_changes = int(st.session_state.get("max_changes_detect", 3))
+
+                    def _detect(series: pd.Series) -> list:
+                        return detect_and_classify(series.dropna(), max_changes=max_changes, window=6)
+
+                    # Determine which series to run on
+                    classified_list: list = []
+                    label_list: list[str] = []
+                    # Auto
+                    if detect_mode.startswith("Auto"):
+                        s_auto = plot_df[target_col].dropna()
+                        classified_list = [_detect(s_auto)]
+                        label_list = [target_col]
+                    # Explicit targets
+                    elif detect_mode == "Total" and ("Total" in plot_df.columns):
+                        classified_list = [_detect(plot_df["Total"])]
+                        label_list = ["Total"]
+                        target_col = "Total"
+                    elif detect_mode == "Free" and ("Free" in plot_df.columns):
+                        classified_list = [_detect(plot_df["Free"])]
+                        label_list = ["Free"]
+                        target_col = "Free"
+                    elif detect_mode == "Paid" and ("Paid" in plot_df.columns):
+                        classified_list = [_detect(plot_df["Paid"])]
+                        label_list = ["Paid"]
+                        target_col = "Paid"
+                    elif detect_mode.startswith("Both") and ({"Total", "Paid"}.issubset(plot_df.columns)):
+                        classified_list = [_detect(plot_df["Total"]), _detect(plot_df["Paid"])]
+                        label_list = ["Total", "Paid"]
+                    else:
+                        st.info("Requested detection target not available in current data.")
+                        classified_list = []
+
+                    # Merge results
+                    merged_events_df = None
+                    merged_classified = []
+
+                    if not classified_list or all(len(c) == 0 for c in classified_list):
                         st.info("No change dates detected with current settings.")
                     else:
-                        classified = bps
-                        seeded = breakpoints_to_events(classified, target_label=target_col)
-                        base = st.session_state.get("events_df", pd.DataFrame(columns=EVENTS_COLUMNS))
-                        merged = pd.concat([base, seeded], ignore_index=True) if not base.empty else seeded
-                        merged = merged.drop_duplicates(subset=["date", "type", "notes"], keep="first")
-                        st.session_state["events_df"] = _clean_events_df(merged)
+                        # Seed events per source label
+                        for cls, label in zip(classified_list, label_list):
+                            if not cls:
+                                continue
+                            seeded_df = breakpoints_to_events(cls, target_label=label)
+                            merged_events_df = (
+                                seeded_df
+                                if merged_events_df is None
+                                else pd.concat(
+                                    [merged_events_df, seeded_df],
+                                    ignore_index=True,
+                                )
+                            )
+                            merged_classified.extend(cls)
 
-                        seg_bkps = breakpoints_for_segments(classified)
+                        # De-duplicate events and store
+                        if merged_events_df is not None and not merged_events_df.empty:
+                            merged_events_df = merged_events_df.drop_duplicates(
+                                subset=["date", "type", "notes"], keep="first"
+                            )
+                            base = st.session_state.get("events_df", pd.DataFrame(columns=EVENTS_COLUMNS))
+                            merged_all = (
+                                pd.concat([base, merged_events_df], ignore_index=True)
+                                if not base.empty
+                                else merged_events_df
+                            )
+                            st.session_state["events_df"] = _clean_events_df(merged_all)
+
+                        # Segment breakpoints from merged classified
+                        seg_bkps = breakpoints_for_segments(merged_classified)
                         st.session_state["detected_breakpoints"] = seg_bkps
-                        st.session_state["detected_change_dates"] = [s.index[i] for i in seg_bkps if i < len(s.index)]
+                        # map indices to dates using Total if present else index
+                        s_idx = plot_df["Total"].dropna().index if "Total" in plot_df.columns else plot_df.index
+                        st.session_state["detected_change_dates"] = [s_idx[i] for i in seg_bkps if i < len(s_idx)]
+                        # Save a human-readable label of what we detected on
+                        if detect_mode.startswith("Both"):
+                            st.session_state["detected_target_label"] = "Total+Paid"
+                        elif label_list:
+                            st.session_state["detected_target_label"] = ",".join(label_list)
+                        else:
+                            st.session_state["detected_target_label"] = target_col
                         st.session_state["detected_target_col"] = target_col
 
                         _set_markers_from_events()
