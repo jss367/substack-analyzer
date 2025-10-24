@@ -4,6 +4,8 @@ from typing import Sequence
 import numpy as np
 import pandas as pd
 
+from substack_analyzer.utils import ensure_month_end_index
+
 
 @dataclass(frozen=True)
 class PiecewiseLogisticFit:
@@ -18,16 +20,6 @@ class PiecewiseLogisticFit:
     r2_on_deltas: float
     gamma_exog: float | None = None
     gamma_intercept: float = 0.0
-
-
-def _ensure_month_end_index(series: pd.Series) -> pd.Series:
-    s = series.dropna().copy()
-    if not isinstance(s.index, pd.DatetimeIndex):
-        raise ValueError("Series must have a DatetimeIndex")
-    # Normalize to month end to align with app import convention
-    s.index = s.index.to_period("M").to_timestamp("M")
-    s = s.sort_index()
-    return s
 
 
 def _segments_from_breakpoints(n: int, breakpoints: Sequence[int]) -> list[tuple[int, int]]:
@@ -88,7 +80,7 @@ def fit_piecewise_logistic(
     - γ_pulse, γ_step, γ_exog are global coefficients.
     - Parameters are estimated by OLS on ΔS_t for each candidate K; pick K with lowest SSE.
     """
-    input_series = _ensure_month_end_index(total_series)
+    input_series = ensure_month_end_index(total_series)
     if input_series.size < 4:
         raise ValueError("Need at least 4 months of data to fit the model")
     # Construct deltas and base regressor X_t(K)
@@ -266,7 +258,7 @@ def fitted_series_from_params(
 
     Applies the same discrete dynamic used in fitting, aligned to month-end index.
     """
-    s = _ensure_month_end_index(total_series)
+    s = ensure_month_end_index(total_series)
     if s.size == 0:
         return s
 
