@@ -1,7 +1,7 @@
 [project]
 name = "substack-analyzer"
 version = "0.0.5"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<=3.14"
 description = "Substack analyzer app"
 readme = "README.md"
 dependencies = []
@@ -9,6 +9,9 @@ dependencies = []
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["substack_analyzer"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

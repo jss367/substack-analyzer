@@ -253,7 +253,7 @@ def build_events_features(plot_df: pd.DataFrame, lam: float, theta: float, ad_fi
     -----
     - Event dates falling outside the monthly index are ignored.
     - If an event's persistence is unspecified, it contributes to both `pulse`
-      and `step` for backward compatibility.
+      and `step` for backward compatibility. #TODO: Undo this
     - All outputs are float-valued and aligned to the month-end index.
     """
     monthly_index = plot_df.index
@@ -297,8 +297,12 @@ def build_events_features(plot_df: pd.DataFrame, lam: float, theta: float, ad_fi
                 ad_df["date"] = ad_df["date"].dt.to_period("M").dt.to_timestamp("M")
                 ad_df = ad_df.groupby("date", as_index=True)["spend"].sum().sort_index()
                 ad_spend = ad_df.reindex(monthly_index).fillna(0.0)
-        except Exception:
-            pass
+        except Exception as e:
+            st.error(
+                "Failed to read Ad Spend file. Ensure it has columns 'date' (YYYY-MM-DD) and 'spend'.\n" f"Details: {e}"
+            )
+            # Stop further execution of this run so the error is clearly surfaced in the UI
+            st.stop()
 
     adstock = pd.Series(0.0, index=monthly_index, name="adstock")
     if not ad_spend.empty:

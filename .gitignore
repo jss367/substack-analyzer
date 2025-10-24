@@ -1,3 +1,6 @@
 __pycache__/
 /data
 /tests/integration
+/outputs
+.DS_Store
+/substack_analyzer.egg-info

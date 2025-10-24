@@ -4,6 +4,27 @@
 
 Open the hosted app: https://substackanalyzer.streamlit.app/ (just click to wake it up if it's gone to sleep)
 
+### Headless (Python-only) runner
+
+You can run the core pipeline from CSV/XLSX files without the UI:
+
+```bash
+python scripts/run_headless.py \
+  --all /path/to/total.csv --all-has-header --all-date-col 0 --all-count-col 1 \
+  --paid /path/to/paid.csv --paid-has-header --paid-date-col 0 --paid-count-col 1 \
+  --events /path/to/events.csv \
+  --adspend /path/to/ad_spend.csv \
+  --max-changes 4 --lam 0.5 --theta 500 \
+  --out-dir ./outputs
+```
+
+Notes:
+
+- `--all` and/or `--paid` should each point to a two-column file (date, count). Use `--*-has-header` and `--*-date-col`/`--*-count-col` to specify header presence and column indices or names.
+- `--events` (optional) CSV columns: `date`, `type`, `persistence`, `cost`.
+- `--adspend` (optional) CSV/XLSX columns: `date`, `spend`.
+- Outputs include `summary.json`, `fitted_series.csv`, `features.csv`, and `covariates.csv` in `--out-dir`.
+
 ## What this does
 
 - Simulates monthly subscriber growth for free and premium cohorts
