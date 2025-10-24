@@ -20,7 +20,6 @@ import argparse
 import json
 import os
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import streamlit as st
@@ -31,7 +30,7 @@ from substack_analyzer.detection import detect_change_points
 from substack_analyzer.utils import ensure_month_end_index
 
 
-def _open_file(path: Optional[str]) -> Optional[object]:
+def _open_file(path: str | None) -> object | None:
     if not path:
         return None
     p = Path(path)
@@ -40,14 +39,14 @@ def _open_file(path: Optional[str]) -> Optional[object]:
     return p.open("rb")
 
 
-def _read_events_csv(path: Optional[str]) -> pd.DataFrame:
+def _read_events_csv(path: str | None) -> pd.DataFrame:
     if not path:
         return pd.DataFrame()
     df = pd.read_csv(path)
     # Accept flexible column sets; normalise column names
     cols = {c.lower().strip(): c for c in df.columns}
 
-    def get(col: str) -> Optional[str]:
+    def get(col: str) -> str | None:
         return cols.get(col)
 
     out = pd.DataFrame()
@@ -64,16 +63,16 @@ def _read_events_csv(path: Optional[str]) -> pd.DataFrame:
 
 
 def run(
-    all_path: Optional[str],
+    all_path: str | None,
     all_has_header: bool,
     all_date_col,
     all_count_col,
-    paid_path: Optional[str],
+    paid_path: str | None,
     paid_has_header: bool,
     paid_date_col,
     paid_count_col,
-    events_path: Optional[str],
-    adspend_path: Optional[str],
+    events_path: str | None,
+    adspend_path: str | None,
     max_changes: int,
     lam: float,
     theta: float,
@@ -82,8 +81,8 @@ def run(
     os.makedirs(out_dir, exist_ok=True)
 
     # Read series
-    total: Optional[pd.Series] = None
-    paid: Optional[pd.Series] = None
+    total: pd.Series | None = None
+    paid: pd.Series | None = None
     if all_path:
         with _open_file(all_path) as f_all:
             total = read_series(f_all, all_has_header, all_date_col, all_count_col)
