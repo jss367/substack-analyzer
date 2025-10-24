@@ -866,7 +866,7 @@ def _current_fit_params():
 
 
 def tail_view_ui(
-    plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, target_col: Optional[str], breakpoints: list[int]
+    plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, target_col: str | None, breakpoints: list[int]
 ) -> None:
     st.subheader("Stage 5: Diagnostics (delta view)")
     st.bar_chart(plot_df.diff().fillna(0))
@@ -919,7 +919,7 @@ def tail_view_ui(
     st.altair_chart(base_chart, use_container_width=True)
 
 
-def metrics_and_apply_ui(all_series, paid_series, net_only: bool) -> None:
+def metrics_and_apply_ui(all_series: pd.Series | None, paid_series: pd.Series | None, net_only: bool) -> None:
     estimates = _compute_estimates(all_series, paid_series, int(_get_state("est_window", 6)))
 
     cols = st.columns(3)

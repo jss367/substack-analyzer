@@ -1,6 +1,5 @@
 import math
 from contextlib import suppress
-from typing import Optional
 
 import altair as alt
 import pandas as pd
@@ -32,7 +31,7 @@ def read_series(file_like, has_header: bool, date_sel, count_sel) -> pd.Series:
         """Parse common date formats without noisy warnings; fall back gracefully."""
         with suppress(Exception):
             sample = values.dropna().astype(str).head(20)
-            fmt: Optional[str] = None
+            fmt: str | None = None
             if not sample.empty:
                 if sample.str.match(r"^\d{4}/\d{2}/\d{2}$").all():
                     fmt = "%Y/%m/%d"
@@ -112,9 +111,7 @@ def plot_series(plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, se
     return chart
 
 
-def compute_estimates(
-    all_series: Optional[pd.Series], paid_series: Optional[pd.Series], window_months: int = 6
-) -> dict:
+def compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | None, window_months: int = 6) -> dict:
     """Derive starting levels and rate estimates from monthly subscriber series.
 
     Computes lightweight, robust estimates to initialize the simulator and
@@ -134,9 +131,9 @@ def compute_estimates(
 
     Parameters
     ----------
-    all_series : Optional[pd.Series]
+    all_series : pd.Series | None
         Monthly All (Total) subscribers indexed by month-end timestamps.
-    paid_series : Optional[pd.Series]
+    paid_series : pd.Series | None
         Monthly Paid subscribers indexed by month-end timestamps.
     window_months : int, default 6
         Tail window size used for median rate calculations.
