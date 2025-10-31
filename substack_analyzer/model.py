@@ -145,4 +145,40 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
         )
 
     monthly_df = pd.DataFrame(data, columns=columns)
+    # Round subscriber stock columns to integers for readability
+    for _col in ["free_subscribers", "premium_subscribers", "total_subscribers"]:
+        if _col in monthly_df.columns:
+            monthly_df[_col] = monthly_df[_col].round().astype(int)
+
+    # Round monthly flow counts to integers
+    flow_cols = [
+        "new_free_organic",
+        "new_free_paid",
+        "free_churned",
+        "premium_converted_from_new",
+        "premium_converted_from_existing",
+        "premium_churned",
+    ]
+    for _col in flow_cols:
+        if _col in monthly_df.columns:
+            monthly_df[_col] = monthly_df[_col].round().astype(int)
+
+    # Round monetary columns to whole dollars
+    money_cols = [
+        "ad_spend",
+        "ad_manager_fee",
+        "mrr_gross",
+        "mrr_net",
+        "net_revenue",
+        "profit",
+        "cumulative_ad_spend",
+        "cumulative_net_profit",
+    ]
+    for _col in money_cols:
+        if _col in monthly_df.columns:
+            monthly_df[_col] = monthly_df[_col].round().astype(int)
+
+    # Ensure month is an integer index-like column
+    if "month" in monthly_df.columns:
+        monthly_df["month"] = monthly_df["month"].round().astype(int)
     return SimulationResult(monthly=monthly_df)
