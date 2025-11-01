@@ -68,6 +68,50 @@
             ]
         },
         {
+            "name": "Scenario: $1k one-time (payback)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/Users/julius/git/substack-analyzer/scripts/run_simulator.py",
+            "console": "integratedTerminal",
+            "cwd": "/Users/julius/git/substack-analyzer",
+            "justMyCode": true,
+            "args": [
+                "--from-out-dir",
+                "/Users/julius/git/substack-analyzer/outputs",
+                "--out-dir",
+                "/Users/julius/git/substack-analyzer/outputs",
+                "--spend-once",
+                "1000",
+                "--once-month",
+                "1",
+                "--horizon",
+                "36",
+                "--cac",
+                "2.0",
+                "--ad-fee",
+                "0",
+                "--price-monthly",
+                "10",
+                "--annual-share",
+                "0"
+            ]
+        },
+        {
+            "name": "Scenario: $1k from phase1.json (minimal)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/Users/julius/git/substack-analyzer/scripts/run_simulator.py",
+            "console": "integratedTerminal",
+            "cwd": "/Users/julius/git/substack-analyzer",
+            "justMyCode": true,
+            "args": [
+                "--phase1",
+                "/Users/julius/git/substack-analyzer/outputs/phase1.json",
+                "--spend-once",
+                "1000"
+            ]
+        },
+        {
             "name": "Streamlit: E2E Walkthrough",
             "type": "debugpy",
             "request": "launch",

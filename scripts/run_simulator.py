@@ -12,7 +12,9 @@ import logging
 from pathlib import Path
 
 import coloredlogs
+import pandas as pd
 
+from substack_analyzer.analysis import compute_estimates
 from substack_analyzer.model import simulate_growth
 from substack_analyzer.types import AdSpendSchedule, SimulationInputs
 
@@ -26,13 +28,37 @@ def _read_summary(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def _read_phase1(path: Path) -> dict:
+    if not path.exists():
+        raise FileNotFoundError(f"phase1.json not found: {path}")
+    return json.loads(path.read_text())
+
+
+def _records_to_series(records: list[dict] | None) -> pd.Series | None:
+    if not records:
+        return None
+    df = pd.DataFrame(records)
+    if not {"date", "count"}.issubset(df.columns):
+        return None
+    df = df.assign(date=lambda d: pd.to_datetime(d["date"]))
+    df = df.dropna(subset=["date"]).sort_values("date")
+    s = pd.to_numeric(df["count"], errors="coerce").dropna()
+    if s.empty:
+        return None
+    s.index = df["date"].dt.to_period("M").dt.to_timestamp("M")
+    return pd.Series(s.values, index=s.index)
+
+
 def run(
     summary_path: str | None,
+    phase1_path: str | None,
     from_out_dir: str | None,
     out_dir: str,
     spend_const: float | None,
     spend_stage1: float | None,
     spend_stage2: float | None,
+    spend_once: float | None,
+    once_month: int,
     horizon: int,
     cac: float,
     ad_fee: float,
@@ -42,17 +68,25 @@ def run(
     out_dir_path = Path(out_dir)
     out_dir_path.mkdir(parents=True, exist_ok=True)
 
-    # Locate summary.json
-    if summary_path:
-        summary_file = Path(summary_path)
-    elif from_out_dir:
-        summary_file = Path(from_out_dir) / "summary.json"
+    # Inputs from Phase 1
+    est: dict = {}
+    if phase1_path:
+        p1 = _read_phase1(Path(phase1_path))
+        total_series = _records_to_series(p1.get("total_series"))
+        paid_series = _records_to_series(p1.get("paid_series"))
+        est = compute_estimates(all_series=total_series, paid_series=paid_series, window_months=6)
+        logger.info("Reading Phase 1 (phase1.json): %s", str(Path(phase1_path).resolve()))
     else:
-        summary_file = out_dir_path / "summary.json"
-
-    logger.info("Reading Phase 1 summary: %s", str(summary_file))
-    summary = _read_summary(summary_file)
-    est = summary.get("estimates", {}) or {}
+        # Locate summary.json
+        if summary_path:
+            summary_file = Path(summary_path)
+        elif from_out_dir:
+            summary_file = Path(from_out_dir) / "summary.json"
+        else:
+            summary_file = out_dir_path / "summary.json"
+        logger.info("Reading Phase 1 summary: %s", str(summary_file))
+        summary = _read_summary(summary_file)
+        est = summary.get("estimates", {}) or {}
 
     # Seed from estimates; allow scenario-only run even if sparse
     start_free = int(est.get("start_free", 0))
@@ -64,11 +98,15 @@ def run(
 
     # Spend schedule
     if spend_const is not None and spend_const > 0:
-        schedule = AdSpendSchedule.constant(float(spend_const))
+        schedule = AdSpendSchedule.constant(spend_const)
         sim_name = f"sim_const_{int(spend_const)}.csv"
     elif (spend_stage1 is not None and spend_stage2 is not None) and (spend_stage1 > 0 or spend_stage2 > 0):
-        schedule = AdSpendSchedule.two_stage(float(spend_stage1 or 0.0), float(spend_stage2 or 0.0))
+        schedule = AdSpendSchedule.two_stage(spend_stage1 or 0.0, spend_stage2 or 0.0)
         sim_name = f"sim_two_stage_{int(spend_stage1 or 0)}_{int(spend_stage2 or 0)}.csv"
+    elif spend_once is not None and spend_once > 0:
+        # one-time investment at the specified month (1-based in CLI, convert to 0-indexed)
+        schedule = AdSpendSchedule.one_time(spend_once, max(once_month - 1, 0))
+        sim_name = f"sim_once_{int(spend_once)}_m{once_month}.csv"
     else:
         schedule = AdSpendSchedule.constant(0.0)
         sim_name = "sim_const_0.csv"
@@ -76,25 +114,25 @@ def run(
     inputs = SimulationInputs(
         starting_free_subscribers=start_free,
         starting_premium_subscribers=start_premium,
-        horizon_months=int(horizon),
+        horizon_months=horizon,
         organic_monthly_growth_rate=organic_growth,
         monthly_churn_rate_free=churn_free,
         monthly_churn_rate_premium=churn_prem,
         new_subscriber_premium_conv_rate=0.0,
         ongoing_premium_conv_rate=conv_ongoing,
-        cost_per_new_free_subscriber=float(cac),
+        cost_per_new_free_subscriber=cac,
         ad_spend_schedule=schedule,
-        ad_manager_monthly_fee=float(ad_fee),
-        premium_monthly_price_gross=float(price_monthly),
-        annual_share=float(annual_share),
+        ad_manager_monthly_fee=ad_fee,
+        premium_monthly_price_gross=price_monthly,
+        annual_share=annual_share,
     )
 
     logger.info(
         "Simulating: horizon=%d, CAC=%.2f, monthly_price=%.2f, annual_share=%.2f, schedule=%s",
-        int(horizon),
-        float(cac),
-        float(price_monthly),
-        float(annual_share),
+        horizon,
+        cac,
+        price_monthly,
+        annual_share,
         sim_name.replace(".csv", ""),
     )
 
@@ -110,6 +148,16 @@ def run(
         f"${s['cumulative_net_profit']:,.0f}",
         f"${s['cumulative_ad_spend']:,.0f}",
     )
+    # Payback month (first month cumulative_net_profit > 0)
+    try:
+        cum = pd.to_numeric(res.monthly["cumulative_net_profit"], errors="coerce")
+        idx = next((i for i, v in enumerate(cum.tolist()) if float(v) > 0.0), None)
+        if idx is None:
+            logger.info("Payback: none within horizon (%d months)", horizon)
+        else:
+            logger.info("Payback: month %d", idx + 1)
+    except Exception:
+        pass
     logger.info("Simulator output: %s", str(out_file.resolve()))
 
 
@@ -123,6 +171,7 @@ def _col_arg(s: str) -> str | int:
 def main() -> None:
     p = argparse.ArgumentParser(description="Headless simulator — Phase 2 (scenario)")
     p.add_argument("--summary", dest="summary_path", type=str, default=None, help="Path to summary.json from Phase 1")
+    p.add_argument("--phase1", dest="phase1_path", type=str, default=None, help="Path to phase1.json artifact")
     p.add_argument(
         "--from-out-dir", dest="from_out_dir", type=str, default=None, help="Directory that contains summary.json"
     )
@@ -138,6 +187,10 @@ def main() -> None:
         default=None,
         help="Two-stage spend (years 1-2, years 3-5)",
     )
+    g.add_argument(
+        "--spend-once", dest="spend_once", type=float, default=None, help="One-time ad spend in a single month"
+    )
+    p.add_argument("--once-month", type=int, default=1, help="Month number (1-based) to apply one-time spend")
 
     p.add_argument("--horizon", type=int, default=60, help="Months to simulate")
     p.add_argument("--cac", type=float, default=2.0, help="Cost per new free subscriber (CAC)")
@@ -149,16 +202,19 @@ def main() -> None:
 
     spend_stage1 = spend_stage2 = None
     if args.spend_two_stage is not None:
-        spend_stage1 = float(args.spend_two_stage[0])
-        spend_stage2 = float(args.spend_two_stage[1])
+        spend_stage1 = args.spend_two_stage[0]
+        spend_stage2 = args.spend_two_stage[1]
 
     run(
         summary_path=args.summary_path,
+        phase1_path=args.phase1_path,
         from_out_dir=args.from_out_dir,
         out_dir=args.out_dir,
         spend_const=args.spend_const,
         spend_stage1=spend_stage1,
         spend_stage2=spend_stage2,
+        spend_once=args.spend_once,
+        once_month=args.once_month,
         horizon=args.horizon,
         cac=args.cac,
         ad_fee=args.ad_fee,

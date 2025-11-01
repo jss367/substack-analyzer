@@ -21,7 +21,12 @@ from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_
 from substack_analyzer.changepoints import breakpoints_to_events, detect_and_classify
 from substack_analyzer.detection import compute_segment_slopes, slope_around
 from substack_analyzer.model import simulate_growth
-from substack_analyzer.persistence import apply_session_bundle, collect_session_bundle
+from substack_analyzer.persistence import (
+    apply_phase_one_json,
+    apply_session_bundle,
+    collect_session_bundle,
+    export_phase_one_json,
+)
 from substack_analyzer.types import AdSpendSchedule, SimulationInputs
 from substack_analyzer.ui import format_currency as ui_format_currency
 from substack_analyzer.ui import format_date_badges as ui_format_date_badges
@@ -652,7 +657,39 @@ def events_features_ui(plot_df: pd.DataFrame) -> None:
         st.session_state["features_df"] = features_df
         st.markdown("**Outputs**: `events_df` (above), `covariates_df`, `features_df`.")
         st.dataframe(features_df.reset_index(), width="stretch")
-        # download buttons unchanged...
+        # Log Phase 1 readiness for Phase 2 handoff
+        try:
+            _bkps = list(st.session_state.get("detected_breakpoints", []))
+            _n_events = 0 if st.session_state.get("events_df") is None else len(st.session_state.get("events_df"))
+            _n_ad_rows = len(covariates_df) if isinstance(covariates_df, pd.DataFrame) else 0
+            logger.info(
+                "Phase 1 outputs ready (breakpoints=%s, events=%d, ad_rows=%d)",
+                _bkps,
+                _n_events,
+                _n_ad_rows,
+            )
+            logger.info("Use 'Download phase1.json' to save handoff to Phase 2.")
+        except Exception:
+            pass
+        # Phase 1 handoff: export/import portable artifact
+        col_dl, col_up = st.columns(2)
+        with col_dl:
+            st.download_button(
+                "Download phase1.json",
+                data=export_phase_one_json(),
+                file_name="phase1.json",
+                mime="application/json",
+                help="Portable handoff from Phase 1 → Phase 2 (series, events, ad spend, breakpoints, knobs)",
+            )
+        with col_up:
+            uploaded_phase1 = st.file_uploader("Load phase1.json", type=["json"], key="phase1_json")
+            if uploaded_phase1 is not None:
+                try:
+                    apply_phase_one_json(uploaded_phase1)
+                    st.success("Phase 1 artifact loaded. Rebuilding features and updating state…")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to load phase1.json: {e}")
 
 
 def adds_and_churn_ui(plot_df: pd.DataFrame) -> None:

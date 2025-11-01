@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 
@@ -30,6 +30,15 @@ class AdSpendSchedule:
             if month_index < 24:
                 return float(years_1_to_2)
             return float(years_3_to_5)
+
+        return AdSpendSchedule(_spend)
+
+    @staticmethod
+    def one_time(amount: float, at_month_index: int = 0) -> "AdSpendSchedule":
+        """Spend only on a single month (0-indexed)."""
+
+        def _spend(month_index: int) -> float:
+            return float(amount) if int(month_index) == int(at_month_index) else 0.0
 
         return AdSpendSchedule(_spend)
 
@@ -83,3 +92,39 @@ class SimulationResult:
             "cumulative_ad_spend": float(last["cumulative_ad_spend"]),
             "peak_mrr_net": float(self.monthly["mrr_net"].max()),
         }
+
+
+@dataclass(frozen=True)
+class EventRow:
+    """Single event annotation row serialized for Phase 1 handoff."""
+
+    date: str
+    type: str
+    persistence: str
+    notes: str
+    cost: float
+
+
+@dataclass(frozen=True)
+class PhaseOneOutput:
+    """Portable handoff artifact from Phase 1 → Phase 2.
+
+    All fields are JSON-serializable. Series are represented as lists of
+    {"date": str, "count": float} records at month-end timestamps.
+    """
+
+    total_series: Optional[List[Dict[str, Any]]]
+    paid_series: Optional[List[Dict[str, Any]]]
+
+    breakpoints_indices: List[int]
+    breakpoints_dates: List[str]
+
+    events: List[EventRow]
+    ad_spend: Optional[List[Dict[str, Any]]]
+
+    adstock_lambda: float
+    ad_log_theta: float
+
+    detect_mode: str
+    detected_target_label: Optional[str]
+    target_col_for_fit: Optional[str]

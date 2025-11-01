@@ -29,6 +29,7 @@ import streamlit as st
 from substack_analyzer.analysis import build_events_features, compute_estimates, read_series
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.detection import detect_change_points
+from substack_analyzer.persistence import export_phase_one_json
 from substack_analyzer.utils import ensure_month_end_index
 
 coloredlogs.install(level="DEBUG")
@@ -130,6 +131,9 @@ def run(
     # Seed minimal session state for downstream code
     st.session_state.clear()
     st.session_state["start_premium"] = int(paid.iloc[-1]) if isinstance(paid, pd.Series) and not paid.empty else 0
+    # Persist series so Phase 1 export includes them
+    st.session_state["import_total"] = total if isinstance(total, pd.Series) else pd.Series(dtype=float)
+    st.session_state["import_paid"] = paid if isinstance(paid, pd.Series) else pd.Series(dtype=float)
 
     # Optional events
     events_df = _read_events_csv(events_path) if events_path else pd.DataFrame()
@@ -238,6 +242,20 @@ def run(
             ad_sum,
         )
     exog = features_df["ad_effect_log"] if "ad_effect_log" in features_df else None
+    # Persist Phase 1 state for export
+    st.session_state["covariates_df"] = covariates_df
+    st.session_state["features_df"] = features_df
+    st.session_state["adstock_lambda"] = float(lam)
+    st.session_state["ad_log_theta"] = float(theta)
+    st.session_state["detected_breakpoints"] = bkps
+    # Map indices to dates based on chosen fit_series base
+    try:
+        s_idx = fit_series.dropna().index
+        change_dates = [s_idx[i] for i in bkps if 0 <= i < len(s_idx)]
+    except Exception:
+        change_dates = []
+    st.session_state["detected_change_dates"] = change_dates
+    st.session_state["detect_on"] = detect_mode
 
     # Estimates
     est = compute_estimates(all_series=plot_df.get("Total"), paid_series=plot_df.get("Paid"), window_months=6)
@@ -290,6 +308,15 @@ def run(
         ev_out.to_csv(out_dir_path / "events_normalized.csv", index=False)
     covariates_df.to_csv(out_dir_path / "covariates.csv", index_label="date")
     features_df.to_csv(out_dir_path / "features.csv", index_label="date")
+
+    # Save Phase 1 portable artifact
+    try:
+        p1_bytes = export_phase_one_json()
+        (out_dir_path / "phase1.json").write_bytes(p1_bytes)
+        logger.info("Phase 1 artifact saved: %s", str((out_dir_path / "phase1.json").resolve()))
+        logger.info("You can load phase1.json in the app (Stage 2) to proceed to Phase 2 fit.")
+    except Exception as e:
+        logger.warning("Phase 1 artifact not saved: %s", e)
 
     # Human-readable equation document (markdown)
     try:
