@@ -20,6 +20,7 @@ import argparse
 import json
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import coloredlogs
@@ -34,6 +35,45 @@ from substack_analyzer.utils import ensure_month_end_index
 
 coloredlogs.install(level="DEBUG")
 logger = logging.getLogger("substack_headless")
+
+
+@dataclass(frozen=True)
+class PhaseOneConfig:
+    all_path: str | None
+    all_has_header: bool
+    all_date_col: str | int
+    all_count_col: str | int
+    paid_path: str | None
+    paid_has_header: bool
+    paid_date_col: str | int
+    paid_count_col: str | int
+    events_path: str | None
+    adspend_path: str | None
+    max_changes: int
+    detect_on: str
+    lam: float
+    theta: float
+    out_dir: str
+
+
+def run_from_phase_one_config(cfg: PhaseOneConfig) -> None:
+    run(
+        all_path=cfg.all_path,
+        all_has_header=cfg.all_has_header,
+        all_date_col=cfg.all_date_col,
+        all_count_col=cfg.all_count_col,
+        paid_path=cfg.paid_path,
+        paid_has_header=cfg.paid_has_header,
+        paid_date_col=cfg.paid_date_col,
+        paid_count_col=cfg.paid_count_col,
+        events_path=cfg.events_path,
+        adspend_path=cfg.adspend_path,
+        max_changes=cfg.max_changes,
+        detect_on=cfg.detect_on,
+        lam=cfg.lam,
+        theta=cfg.theta,
+        out_dir=cfg.out_dir,
+    )
 
 
 def _open_file(path: str | None) -> object | None:
@@ -367,8 +407,8 @@ def run(
             lines.append(f"- gamma_step: {float(gs):0.4f}")
         if gx is not None:
             lines.append(f"- gamma_exog (log ad effect): {float(gx):0.4f}")
-        lines.append(f"- Adstock lambda (lam): {float(lam):0.3f}")
-        lines.append(f"- Log-scale theta: {float(theta):0.3f}")
+        lines.append(f"- Adstock lambda (lam): {float(lam_best):0.3f}")
+        lines.append(f"- Log-scale theta: {float(theta_best):0.3f}")
         lines.append("")
         lines.append("## Inputs")
         lines.append("- x_t = features['ad_effect_log'] (built from ad_spend with adstock + log transform)")
@@ -436,7 +476,7 @@ def main() -> None:
 
     args = p.parse_args()
 
-    run(
+    cfg = PhaseOneConfig(
         all_path=args.all_path,
         all_has_header=args.all_has_header,
         all_date_col=args.all_date_col,
@@ -453,6 +493,7 @@ def main() -> None:
         theta=args.theta,
         out_dir=args.out_dir,
     )
+    run_from_phase_one_config(cfg)
 
 
 if __name__ == "__main__":
