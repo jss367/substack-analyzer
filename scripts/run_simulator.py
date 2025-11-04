@@ -9,6 +9,7 @@ monthly results and logs a concise summary.
 import argparse
 import json
 import logging
+import math
 from pathlib import Path
 
 import coloredlogs
@@ -70,12 +71,16 @@ def run(
 
     # Inputs from Phase 1
     est: dict = {}
+    fit_params: dict | None = None
     if phase1_path:
         p1 = _read_phase1(Path(phase1_path))
         total_series = _records_to_series(p1.get("total_series"))
         paid_series = _records_to_series(p1.get("paid_series"))
         est = compute_estimates(all_series=total_series, paid_series=paid_series, window_months=6)
         logger.info("Reading Phase 1 (phase1.json): %s", str(Path(phase1_path).resolve()))
+        fit_params = p1.get("fit_params") if isinstance(p1, dict) else None
+        lam = float(p1.get("adstock_lambda", 0.5))
+        theta = float(p1.get("ad_log_theta", 500.0))
     else:
         # Locate summary.json
         if summary_path:
@@ -87,6 +92,19 @@ def run(
         logger.info("Reading Phase 1 summary: %s", str(summary_file))
         summary = _read_summary(summary_file)
         est = summary.get("estimates", {}) or {}
+        # Try to collect fit params when available in summary
+        if all(k in summary for k in ("carrying_capacity", "segment_growth_rates")):
+            fit_params = {
+                "carrying_capacity": float(summary.get("carrying_capacity")),
+                "segment_growth_rates": list(summary.get("segment_growth_rates", []) or []),
+                "breakpoints": list(summary.get("breakpoints", []) or []),
+                "gamma_pulse": float(summary.get("gamma_pulse", 0.0)),
+                "gamma_step": float(summary.get("gamma_step", 0.0)),
+                "gamma_exog": summary.get("gamma_exog"),
+                "gamma_intercept": float(summary.get("gamma_intercept", 0.0)),
+            }
+        lam = 0.5
+        theta = 500.0
 
     # Seed from estimates; allow scenario-only run even if sparse
     start_free = int(est.get("start_free", 0))
@@ -149,16 +167,75 @@ def run(
         f"${s['cumulative_ad_spend']:,.0f}",
     )
     # Payback month (first month cumulative_net_profit > 0)
-    try:
-        cum = pd.to_numeric(res.monthly["cumulative_net_profit"], errors="coerce")
-        idx = next((i for i, v in enumerate(cum.tolist()) if float(v) > 0.0), None)
-        if idx is None:
-            logger.info("Payback: none within horizon (%d months)", horizon)
-        else:
-            logger.info("Payback: month %d", idx + 1)
-    except Exception:
-        pass
+    cum = pd.to_numeric(res.monthly["cumulative_net_profit"], errors="coerce")
+    idx = next((i for i, v in enumerate(cum.tolist()) if float(v) > 0.0), None)
+    if idx is None:
+        logger.info("Payback: none within horizon (%d months)", horizon)
+    else:
+        logger.info("Payback: month %d", idx + 1)
     logger.info("Simulator output: %s", str(out_file.resolve()))
+
+    # Optional: Forecast total subscribers using fitted equation if fit params were provided
+    if fit_params is not None:
+        K = float(fit_params.get("carrying_capacity", 0.0))
+        r_list = [float(x) for x in (fit_params.get("segment_growth_rates") or [])]
+        bkps = [int(b) for b in (fit_params.get("breakpoints") or [])]
+        gamma_pulse = float(fit_params.get("gamma_pulse", 0.0))
+        gamma_step = float(fit_params.get("gamma_step", 0.0))
+        gamma_exog = fit_params.get("gamma_exog")
+        gamma_intercept = float(fit_params.get("gamma_intercept", 0.0))
+
+        # Determine starting S0 and last adstock
+        S0 = float(est.get("start_free", 0) + est.get("start_premium", 0))
+        last_adstock = 0.0
+        if from_out_dir:
+            fpath = Path(from_out_dir) / "features.csv"
+            if fpath.exists():
+                fdf = pd.read_csv(fpath)
+                if "adstock" in fdf.columns:
+                    last_adstock = float(pd.to_numeric(fdf["adstock"], errors="coerce").dropna().iloc[-1])
+
+        # Build adstock ahead using schedule
+        if spend_const is not None and spend_const > 0:
+            schedule = AdSpendSchedule.constant(spend_const)
+        elif (spend_stage1 is not None and spend_stage2 is not None) and (spend_stage1 > 0 or spend_stage2 > 0):
+            schedule = AdSpendSchedule.two_stage(spend_stage1 or 0.0, spend_stage2 or 0.0)
+        elif spend_once is not None and spend_once > 0:
+            schedule = AdSpendSchedule.one_time(spend_once, max(once_month - 1, 0))
+        else:
+            schedule = AdSpendSchedule.constant(0.0)
+
+        adstock_vals = []
+        prev_a = float(last_adstock)
+        for m in range(horizon):
+            x = float(schedule.get_spend_for_month(m))
+            a = x + float(lam) * prev_a
+            adstock_vals.append(a)
+            prev_a = a
+        x_log = [0.0] * horizon
+        if theta and theta > 0:
+            x_log = [float(math.log(1.0 + a / float(theta))) for a in adstock_vals]
+
+        # Piecewise segment mapping for forecast months: use last segment rate
+        r_last = float(r_list[-1] if r_list else 0.0)
+
+        # Simulate
+        S = [float(S0)]
+        for t in range(1, horizon + 1):
+            S_prev = S[-1]
+            x_base = S_prev * (1.0 - S_prev / float(K)) if K > 0 else 0.0
+            r_t = r_last
+            delta = float(gamma_intercept) + r_t * x_base
+            if gamma_exog is not None:
+                delta += float(gamma_exog) * float(x_log[t - 1] if (t - 1) < len(x_log) else 0.0)
+            S.append(max(S_prev + delta, 0.0))
+
+        # Write forecast
+        fc_index = pd.date_range(pd.Timestamp.today().to_period("M").to_timestamp("M"), periods=horizon, freq="ME")
+        fc_df = pd.DataFrame({"total_forecast": S[1:]}, index=fc_index)
+        out_fit = Path(out_dir) / ("fitted_forecast.csv")
+        fc_df.to_csv(out_fit, index_label="date")
+        logger.info("Fitted-equation forecast saved: %s", str(out_fit.resolve()))
 
 
 def _col_arg(s: str) -> str | int:

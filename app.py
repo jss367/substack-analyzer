@@ -11,6 +11,7 @@ import streamlit.components.v1 as components
 from streamlit.logger import get_logger
 
 from substack_analyzer.analysis import (
+    auto_tune_adstock,
     build_events_features,
     compute_estimates,
     derive_adds_churn,
@@ -631,30 +632,46 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
 
 def events_features_ui(plot_df: pd.DataFrame) -> None:
     with st.expander("Stage 2: Events & Features (monthly)", expanded=False):
-        st.caption("Encodes pulse/step features from Events and optional ad spend adstock + log transform.")
-        cov_col1, cov_col2 = st.columns(2)
-        with cov_col1:
-            ad_file = st.file_uploader(
-                "Optional: Ad spend CSV (date, spend)", type=["csv", "xlsx", "xls"], key="ad_csv"
-            )
-        with cov_col2:
-            lam = st.slider("Adstock lambda (carryover)", 0.0, 0.99, 0.5, 0.01)
-            theta = st.number_input("Log transform theta", min_value=1.0, value=500.0, step=50.0)
+        st.caption("Encodes pulse/step features from Events and optional ad spend. Auto-tunes adstock λ and log θ.")
+        # Optional ad spend file
+        ad_file = st.file_uploader("Optional: Ad spend CSV (date, spend)", type=["csv", "xlsx", "xls"], key="ad_csv")
 
         # --- Protect the user-edited events from accidental in-place mutation downstream ---
         _ev_backup = st.session_state.get("events_df", pd.DataFrame(columns=EVENTS_COLUMNS))
         st.session_state["events_df"] = _ev_backup.copy(deep=True)
         try:
-            covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+            # Auto-tune lambda and theta when ad spend is provided; else use defaults
+            lam_best: float = 0.5
+            theta_best: float = 500.0
+            covariates_df: pd.DataFrame
+            features_df: pd.DataFrame
+
+            if ad_file is not None:
+                fit_series_source = plot_df.get("Total") if "Total" in plot_df.columns else plot_df.get("Free")
+                bkps = list(st.session_state.get("detected_breakpoints", []) or [])
+                events_df_local = st.session_state.get("events_df")
+                lam_best, theta_best, covariates_df, features_df = auto_tune_adstock(
+                    plot_df,
+                    ad_file=ad_file,
+                    breakpoints=bkps,
+                    events_df=events_df_local,
+                    fit_series=fit_series_source,
+                )
+            else:
+                # No ad spend file: build only pulse/step; defaults for lam/theta kept
+                covariates_df, features_df = build_events_features(
+                    plot_df, lam=lam_best, theta=theta_best, ad_file=ad_file
+                )
         finally:
             # Always restore the user-owned table, even if the builder throws
             st.session_state["events_df"] = _ev_backup
         # ------------------------------------------------------------------------------
 
-        st.session_state["adstock_lambda"] = float(lam)
-        st.session_state["ad_log_theta"] = float(theta)
+        st.session_state["adstock_lambda"] = float(lam_best)
+        st.session_state["ad_log_theta"] = float(theta_best)
         st.session_state["covariates_df"] = covariates_df
         st.session_state["features_df"] = features_df
+        st.markdown(f"**Auto-selected**: λ={lam_best:0.2f}, θ={theta_best:0.0f}")
         st.markdown("**Outputs**: `events_df` (above), `covariates_df`, `features_df`.")
         st.dataframe(features_df.reset_index(), width="stretch")
         # Log Phase 1 readiness for Phase 2 handoff
@@ -897,7 +914,8 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 st.altair_chart(chart_fc, use_container_width=True)
 
         except Exception as e:
-            st.error(f"Model fit failed: {e}")
+            logger.exception("Model fit failed")
+            st.exception(e)
 
 
 def _current_fit_params():

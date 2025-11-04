@@ -314,6 +314,19 @@ def export_phase_one_json() -> bytes:
         target_col_for_fit=st.session_state.get("detected_target_col"),
     ).__dict__
 
+    # If a model fit is present, include its parameters for Phase 2 equation-based simulation
+    fit = st.session_state.get("pwlog_fit")
+    if fit is not None:
+        payload["fit_params"] = {
+            "carrying_capacity": float(getattr(fit, "carrying_capacity", 0.0)),
+            "segment_growth_rates": [float(x) for x in getattr(fit, "segment_growth_rates", [])],
+            "breakpoints": list(getattr(fit, "breakpoints", [])),
+            "gamma_pulse": float(getattr(fit, "gamma_pulse", 0.0)),
+            "gamma_step": float(getattr(fit, "gamma_step", 0.0)),
+            "gamma_exog": (None if getattr(fit, "gamma_exog", None) is None else float(getattr(fit, "gamma_exog"))),
+            "gamma_intercept": float(getattr(fit, "gamma_intercept", 0.0)),
+        }
+
     return json.dumps(payload, indent=2).encode("utf-8")
 
 

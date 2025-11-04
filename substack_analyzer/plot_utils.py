@@ -8,7 +8,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from substack_analyzer.calibration import PiecewiseLogisticFit
+from substack_analyzer.data_structures import PiecewiseLogisticFit
 from substack_analyzer.utils import ensure_month_end_index
 
 

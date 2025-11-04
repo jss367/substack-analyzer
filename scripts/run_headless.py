@@ -26,7 +26,7 @@ import coloredlogs
 import pandas as pd
 import streamlit as st
 
-from substack_analyzer.analysis import build_events_features, compute_estimates, read_series
+from substack_analyzer.analysis import auto_tune_adstock, build_events_features, compute_estimates, read_series
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.detection import detect_change_points
 from substack_analyzer.persistence import export_phase_one_json
@@ -230,9 +230,24 @@ def run(
         raise SystemExit(f"Unknown detect-on mode: {detect_mode}")
     logger.info("Detection mode=%s, breakpoints=%s", detect_mode, bkps)
 
-    # Features and optional ad spend
+    # Features and optional ad spend (auto-tune lam/theta if ad spend provided)
     ad_file_handle = _open_file(adspend_path) if adspend_path else None
-    covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file_handle)
+    lam_best = float(lam)
+    theta_best = float(theta)
+    if ad_file_handle is not None:
+        lam_best, theta_best, covariates_df, features_df = auto_tune_adstock(
+            plot_df,
+            ad_file=ad_file_handle,
+            breakpoints=bkps,
+            events_df=st.session_state.get("events_df"),
+            fit_series=fit_series,
+        )
+        logger.info("Auto-selected adstock: lambda=%.2f, theta=%.0f", lam_best, theta_best)
+    else:
+        covariates_df, features_df = build_events_features(
+            plot_df, lam=lam_best, theta=theta_best, ad_file=ad_file_handle
+        )
+
     if adspend_path:
         ad_sum = float(covariates_df["ad_spend"].sum()) if "ad_spend" in covariates_df.columns else 0.0
         logger.info(
@@ -245,8 +260,8 @@ def run(
     # Persist Phase 1 state for export
     st.session_state["covariates_df"] = covariates_df
     st.session_state["features_df"] = features_df
-    st.session_state["adstock_lambda"] = float(lam)
-    st.session_state["ad_log_theta"] = float(theta)
+    st.session_state["adstock_lambda"] = float(lam_best)
+    st.session_state["ad_log_theta"] = float(theta_best)
     st.session_state["detected_breakpoints"] = bkps
     # Map indices to dates based on chosen fit_series base
     try:
@@ -272,6 +287,8 @@ def run(
         events_df=st.session_state.get("events_df"),
         extra_exog=exog,
     )
+    # Expose fit in session state so phase1.json export can include fit params
+    st.session_state["pwlog_fit"] = fit
     try:
         k_disp = int(getattr(fit, "carrying_capacity", 0) or 0)
         r2 = float(getattr(fit, "r2_on_deltas", 0.0))
@@ -301,8 +318,9 @@ def run(
     # Write artifacts
     try:
         fit.fitted_series.to_csv(out_dir_path / "fitted_series.csv", header=["fitted"], index_label="date")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception("Failed to write fitted_series.csv")
+        raise
     ev_out = st.session_state.get("events_df")
     if isinstance(ev_out, pd.DataFrame) and not ev_out.empty:
         ev_out.to_csv(out_dir_path / "events_normalized.csv", index=False)

@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run: Substack Analyzer (headless)",
+            "name": "Phase 1: Substack Analyzer (headless)",
             "type": "debugpy",
             "request": "launch",
             "program": "/Users/julius/git/substack-analyzer/scripts/run_headless.py",
@@ -30,10 +30,6 @@
                 "/Users/julius/git/substack-analyzer/data/city_of_yes_ad_campaigns.csv",
                 "--max-changes",
                 "4",
-                "--lam",
-                "0.5",
-                "--theta",
-                "500",
                 "--out-dir",
                 "/Users/julius/git/substack-analyzer/outputs",
                 "--detect-on",
@@ -41,7 +37,7 @@
             ]
         },
         {
-            "name": "Run: Simulator (Phase 2 scenario)",
+            "name": "Phase 2: Simulator (scenario)",
             "type": "debugpy",
             "request": "launch",
             "program": "/Users/julius/git/substack-analyzer/scripts/run_simulator.py",
@@ -68,7 +64,7 @@
             ]
         },
         {
-            "name": "Scenario: $1k one-time (payback)",
+            "name": "Phase 2: $1k one-time (payback)",
             "type": "debugpy",
             "request": "launch",
             "program": "/Users/julius/git/substack-analyzer/scripts/run_simulator.py",
@@ -97,7 +93,7 @@
             ]
         },
         {
-            "name": "Scenario: $1k from phase1.json (minimal)",
+            "name": "Phase 2: $1k from phase1.json (minimal)",
             "type": "debugpy",
             "request": "launch",
             "program": "/Users/julius/git/substack-analyzer/scripts/run_simulator.py",
@@ -112,7 +108,7 @@
             ]
         },
         {
-            "name": "Streamlit: E2E Walkthrough",
+            "name": "Both Phases: Streamlit E2E Walkthrough",
             "type": "debugpy",
             "request": "launch",
             "module": "streamlit",

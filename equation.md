@@ -12,7 +12,10 @@ K - carrying capacity: 200
 
 at - adstocked spend- output of adstock(x, lam) where x = df[ad_col] (or zeros if no ads) and lam = fit["lam"] (or a fixed value from half-life)
 
-g(at) — These are things that have a persistent effect. You started writing full time. Your are listed on a famous blog in a blogroll.
+g(a_t) — These are things that have a persistent effect. You started writing full time. Your are listed on a famous blog in a blogroll.
+
+g(a_t) is made of a couple things. g(a_t) = γ_exog · log(1 + a_t / θ). a_t = x_t + λ a_{t-1}. So we have this adstock lambda term. If lambda = 0, then there's no carryover. There's a pure pulse of spend. For higher lambda, there's longer persistence.
+
 
 γpulset - these are transient shocks. your piece goes viral on Twitter, Substack itself features you on their homepage, you get a hacket job in the nytimes. You bought a one-time superbowl commercial for your substack. These things have a relatively short half-life.
 
