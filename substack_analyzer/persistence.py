@@ -4,7 +4,7 @@ import math
 import zipfile
 from contextlib import suppress
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -236,7 +236,7 @@ def apply_session_bundle(file_like) -> None:
             st.session_state.update({"import_paid": pd.Series(dtype=float)})
 
 
-def _series_to_records(s: Optional[pd.Series]) -> Optional[List[Dict[str, Any]]]:
+def _series_to_records(s: pd.Series | None) -> list[dict[str, Any]] | None:
     if s is None or not isinstance(s, pd.Series) or s.empty:
         return None
     s2 = s.dropna()
@@ -248,7 +248,7 @@ def _series_to_records(s: Optional[pd.Series]) -> Optional[List[Dict[str, Any]]]
     return df.to_dict(orient="records")
 
 
-def _records_to_series(records: Optional[List[Dict[str, Any]]]) -> Optional[pd.Series]:
+def _records_to_series(records: list[dict[str, Any]] | None) -> pd.Series | None:
     if not records:
         return None
     df = pd.DataFrame(records)
@@ -274,7 +274,7 @@ def export_phase_one_json() -> bytes:
     events_df = st.session_state.get("events_df")
     cov_df = st.session_state.get("covariates_df")
 
-    ev_rows: List[Dict[str, Any]] = []
+    ev_rows: list[dict[str, Any]] = []
     if isinstance(events_df, pd.DataFrame) and not events_df.empty:
         e2 = events_df.copy()
         with suppress(Exception):
@@ -290,7 +290,7 @@ def export_phase_one_json() -> bytes:
                 ).__dict__
             )
 
-    ad_spend_records: Optional[List[Dict[str, Any]]] = None
+    ad_spend_records: list[dict[str, Any]] | None = None
     if isinstance(cov_df, pd.DataFrame) and ("ad_spend" in cov_df.columns) and not cov_df.empty:
         df = cov_df[["ad_spend"]].copy()
         df = df.reset_index().rename(columns={df.index.name or "index": "date"})
@@ -298,7 +298,7 @@ def export_phase_one_json() -> bytes:
             df["date"] = pd.to_datetime(df["date"]).dt.date.astype(str)
         ad_spend_records = df.rename(columns={"ad_spend": "spend"}).to_dict(orient="records")
 
-    payload: Dict[str, Any] = PhaseOneOutput(
+    payload: dict[str, Any] = PhaseOneOutput(
         total_series=_series_to_records(total),
         paid_series=_series_to_records(paid),
         breakpoints_indices=list(st.session_state.get("detected_breakpoints", []) or []),
@@ -389,7 +389,7 @@ def apply_phase_one_json(file_like) -> None:
     st.session_state["ad_log_theta"] = float(obj.get("ad_log_theta", 500.0))
 
     # Rebuild features_df on union monthly index
-    idx_sources: List[pd.DatetimeIndex] = []
+    idx_sources: list[pd.DatetimeIndex] = []
     if isinstance(st.session_state.get("import_total"), pd.Series) and not st.session_state["import_total"].empty:
         idx_sources.append(st.session_state["import_total"].index)
     if isinstance(st.session_state.get("import_paid"), pd.Series) and not st.session_state["import_paid"].empty:
@@ -433,7 +433,7 @@ def apply_phase_one_json(file_like) -> None:
         ad_spend = covariates_df.reindex(base_index).fillna(0.0)["ad_spend"]
     lam = float(st.session_state.get("adstock_lambda", 0.5))
     theta = float(st.session_state.get("ad_log_theta", 500.0))
-    adstock_vals: List[float] = []
+    adstock_vals: list[float] = []
     prev = 0.0
     for v in ad_spend.to_list():
         s_val = float(v) + lam * float(prev)

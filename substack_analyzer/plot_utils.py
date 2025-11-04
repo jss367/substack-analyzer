@@ -2,20 +2,18 @@
 A simple plotting tool for visualizing series and fits.
 """
 
-from typing import Optional
-
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from substack_analyzer.data_structures import PiecewiseLogisticFit
+from substack_analyzer.types import PiecewiseLogisticFit
 from substack_analyzer.utils import ensure_month_end_index
 
 
 def plot_fit_vs_actual(
     input_series: pd.Series,
     fit: PiecewiseLogisticFit,
-    title: Optional[str] = None,
+    title: str | None = None,
     show_breakpoints: bool = True,
 ):
     """Overlay actual `input_series` and fitted series using matplotlib.
@@ -30,7 +28,7 @@ def plot_fit_vs_actual(
     fit : PiecewiseLogisticFit
         Result from `fit_piecewise_logistic` containing `fitted_series` and
         `breakpoints`.
-    title : Optional[str]
+    title : str | None
         Optional chart title. Defaults to a summary with R^2 and SSE.
     show_breakpoints : bool
         If True, draw vertical rules at the model's breakpoints.

@@ -1,7 +1,26 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 import pandas as pd
+
+
+@dataclass(frozen=True)
+class PiecewiseLogisticFit:
+    """
+    A fit of the piecewise logistic model.
+    """
+
+    carrying_capacity: float
+    segment_growth_rates: list[float]
+    breakpoints: list[int]
+    gamma_pulse: float
+    gamma_step: float
+    fitted_series: pd.Series
+    residuals: pd.Series
+    sse: float
+    r2_on_deltas: float
+    gamma_exog: float | None = None
+    gamma_intercept: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -113,18 +132,18 @@ class PhaseOneOutput:
     {"date": str, "count": float} records at month-end timestamps.
     """
 
-    total_series: Optional[List[Dict[str, Any]]]
-    paid_series: Optional[List[Dict[str, Any]]]
+    total_series: list[dict[str, Any]] | None
+    paid_series: list[dict[str, Any]] | None
 
-    breakpoints_indices: List[int]
-    breakpoints_dates: List[str]
+    breakpoints_indices: list[int]
+    breakpoints_dates: list[str]
 
-    events: List[EventRow]
-    ad_spend: Optional[List[Dict[str, Any]]]
+    events: list[EventRow]
+    ad_spend: list[dict[str, Any]] | None
 
     adstock_lambda: float
     ad_log_theta: float
 
     detect_mode: str
-    detected_target_label: Optional[str]
-    target_col_for_fit: Optional[str]
+    detected_target_label: str | None
+    target_col_for_fit: str | None
