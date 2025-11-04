@@ -1,25 +1,10 @@
-from dataclasses import dataclass
 from typing import Sequence
 
 import numpy as np
 import pandas as pd
 
+from substack_analyzer.data_structures import PiecewiseLogisticFit
 from substack_analyzer.utils import ensure_month_end_index
-
-
-@dataclass(frozen=True)
-class PiecewiseLogisticFit:
-    carrying_capacity: float
-    segment_growth_rates: list[float]
-    breakpoints: list[int]
-    gamma_pulse: float
-    gamma_step: float
-    fitted_series: pd.Series
-    residuals: pd.Series
-    sse: float
-    r2_on_deltas: float
-    gamma_exog: float | None = None
-    gamma_intercept: float = 0.0
 
 
 def _segments_from_breakpoints(n: int, breakpoints: Sequence[int]) -> list[tuple[int, int]]:

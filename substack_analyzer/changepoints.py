@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Tuple
+from typing import List, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -29,7 +29,7 @@ def _mad(x: np.ndarray) -> float:
     return 1.4826 * np.median(np.abs(x - m))
 
 
-def _fit_line(y: pd.Series) -> Tuple[float, float]:
+def _fit_line(y: pd.Series) -> tuple[float, float]:
     n = len(y)
     if n < 2:
         return 0.0, float(y.iloc[-1]) if n else 0.0
