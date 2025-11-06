@@ -30,3 +30,34 @@ def ad_spend_csv_for_index(idx: pd.DatetimeIndex, monthly_spend: float) -> str:
         for d in idx:
             f.write(f"{d.date()},{monthly_spend}\n")
         return f.name
+
+
+def ad_spend_csv_with_spikes(idx: pd.DatetimeIndex, spikes: dict) -> str:
+    """Write a temp CSV path with zero spend except at specified spike months.
+
+    spikes keys can be pd.Timestamp, datetime.date, or ISO date strings matching idx dates.
+    """
+
+    # Normalize spike keys to date() for direct comparison
+    def _normalize_key(k):
+        try:
+            if isinstance(k, str):
+                return pd.to_datetime(k).date()
+            if hasattr(k, "date"):
+                return k.date()
+            return pd.to_datetime(k).date()
+        except Exception:
+            return None
+
+    norm_spikes = {}
+    for k, v in spikes.items():
+        nk = _normalize_key(k)
+        if nk is not None:
+            norm_spikes[nk] = float(v)
+
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".csv", delete=False, encoding="utf-8") as f:
+        f.write("date,spend\n")
+        for d in idx:
+            amt = norm_spikes.get(d.date(), 0.0)
+            f.write(f"{d.date()},{amt}\n")
+        return f.name
