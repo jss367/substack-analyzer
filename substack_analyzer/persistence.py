@@ -317,14 +317,22 @@ def export_phase_one_json() -> bytes:
     # If a model fit is present, include its parameters for Phase 2 equation-based simulation
     fit = st.session_state.get("pwlog_fit")
     if fit is not None:
+        # Round for readability/portability in JSON
+        def _rf(v: float | None, nd: int = 6) -> float | None:
+            if v is None:
+                return None
+            return round(float(v), nd)
+
         payload["fit_params"] = {
-            "carrying_capacity": float(getattr(fit, "carrying_capacity", 0.0)),
-            "segment_growth_rates": [float(x) for x in getattr(fit, "segment_growth_rates", [])],
+            "carrying_capacity": int(round(float(getattr(fit, "carrying_capacity", 0.0)))),
+            "segment_growth_rates": [round(float(x), 6) for x in getattr(fit, "segment_growth_rates", [])],
             "breakpoints": list(getattr(fit, "breakpoints", [])),
-            "gamma_pulse": float(getattr(fit, "gamma_pulse", 0.0)),
-            "gamma_step": float(getattr(fit, "gamma_step", 0.0)),
-            "gamma_exog": (None if getattr(fit, "gamma_exog", None) is None else float(getattr(fit, "gamma_exog"))),
-            "gamma_intercept": float(getattr(fit, "gamma_intercept", 0.0)),
+            "gamma_pulse": _rf(float(getattr(fit, "gamma_pulse", 0.0))),
+            "gamma_step": _rf(float(getattr(fit, "gamma_step", 0.0))),
+            "gamma_exog": _rf(
+                (None if getattr(fit, "gamma_exog", None) is None else float(getattr(fit, "gamma_exog")))
+            ),
+            "gamma_intercept": _rf(float(getattr(fit, "gamma_intercept", 0.0))),
         }
 
     return json.dumps(payload, indent=2).encode("utf-8")

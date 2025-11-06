@@ -3,7 +3,7 @@ from typing import Sequence
 import numpy as np
 import pandas as pd
 
-from substack_analyzer.data_structures import PiecewiseLogisticFit
+from substack_analyzer.types import PiecewiseLogisticFit
 from substack_analyzer.utils import ensure_month_end_index
 
 
