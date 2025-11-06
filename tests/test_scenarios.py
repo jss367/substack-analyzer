@@ -42,28 +42,28 @@ def test_phase1_ads_really_valuable_phase1_json():
     data = export_phase_one_json()
     obj = json.loads(data)
     fp = obj.get("fit_params")
-    assert isinstance(fp, dict)
+    assert isinstance(fp, dict), f"fit_params {fp} is not a dict"
 
     # Rounding and typing
-    assert 10000 < fp["carrying_capacity"] < 30000
+    assert 10000 < fp["carrying_capacity"] < 30000, f"carrying_capacity {fp['carrying_capacity']} is not in range"
     for x in fp["segment_growth_rates"]:
-        assert 0.10 < x < 0.50
+        assert 0.10 < x < 0.50, f"segment_growth_rates {x} is not in range"
     for k in ["gamma_pulse", "gamma_step", "gamma_intercept"]:
-        assert abs(fp[k] - round(fp[k], 6)) == 0
+        assert abs(fp[k] - round(fp[k], 6)) == 0, f"{k} {fp[k]} is not rounded to 6 decimals"
     # Reasonable ranges given no pulse/step events in this scenario
-    assert abs(fp["gamma_pulse"]) <= 1e-3
-    assert abs(fp["gamma_step"]) <= 1e-3
+    assert abs(fp["gamma_pulse"]) <= 1e-3, f"gamma_pulse {fp['gamma_pulse']} is too high"
+    assert abs(fp["gamma_step"]) <= 1e-3, f"gamma_step {fp['gamma_step']} is too high"
     # Intercept should be modest; synthetic series has no explicit intercept
-    assert -10.0 <= fp["gamma_intercept"] <= 10.0
+    assert -10.0 <= fp["gamma_intercept"] <= 10.0, f"gamma_intercept {fp['gamma_intercept']} is too high"
 
     # Valuable ads: gamma_exog should be positive and of reasonable magnitude
     gx = fp.get("gamma_exog")
-    assert gx is not None and isinstance(gx, float)
+    assert gx is not None and isinstance(gx, float), f"gamma_exog {gx} is not a float"
     # Export rounds to 6 decimals
-    assert abs(gx - round(gx, 6)) == 0
+    assert abs(gx - round(gx, 6)) == 0, f"gamma_exog {gx} is not rounded to 6 decimals"
     # In this synthetic setup, true g_exog=100 and ad_effect_log ~ O(1-5)
     # Keep a conservative band around 100
-    assert 50.0 <= gx <= 200.0
+    assert 50.0 <= gx <= 200.0, f"gamma_exog {gx} is not in range"
 
 
 def test_phase1_ads_have_no_effect_phase1_json():
@@ -99,23 +99,23 @@ def test_phase1_ads_have_no_effect_phase1_json():
     data = export_phase_one_json()
     obj = json.loads(data)
     fp = obj.get("fit_params")
-    assert isinstance(fp, dict)
+    assert isinstance(fp, dict), f"fit_params {fp} is not a dict"
 
     # Rounding and typing
-    assert isinstance(fp["carrying_capacity"], int)
+    assert isinstance(fp["carrying_capacity"], int), f"carrying_capacity {fp['carrying_capacity']} is not an int"
     for x in fp["segment_growth_rates"]:
-        assert abs(x - round(x, 6)) == 0
+        assert abs(x - round(x, 6)) == 0, f"segment_growth_rates {x} is not rounded to 6 decimals"
     for k in ["gamma_pulse", "gamma_step", "gamma_intercept"]:
-        assert abs(fp[k] - round(fp[k], 6)) == 0
+        assert abs(fp[k] - round(fp[k], 6)) == 0, f"{k} {fp[k]} is not rounded to 6 decimals"
     # Reasonable ranges given no pulse/step events in this scenario
-    assert abs(fp["gamma_pulse"]) <= 1e-3
-    assert abs(fp["gamma_step"]) <= 1e-3
+    assert abs(fp["gamma_pulse"]) <= 1e-3, f"gamma_pulse {fp['gamma_pulse']} is too high"
+    assert abs(fp["gamma_step"]) <= 1e-3, f"gamma_step {fp['gamma_step']} is too high"
     # Intercept should be modest; synthetic series has no explicit intercept
-    assert -10.0 <= fp["gamma_intercept"] <= 10.0
+    assert -10.0 <= fp["gamma_intercept"] <= 10.0, f"gamma_intercept {fp['gamma_intercept']} is too high"
 
     # No effect: gamma_exog should round to 0.0
     gx = fp.get("gamma_exog")
-    assert gx is None or isinstance(gx, float)
+    assert gx is None or isinstance(gx, float), f"gamma_exog {gx} is not a float"
     # Export rounds to 6 decimals; enforce rounding consistency and near-zero magnitude
-    assert abs(gx - round(gx, 6)) == 0
-    assert abs(gx) <= 1e-6
+    assert abs(gx - round(gx, 6)) == 0, f"gamma_exog {gx} is not rounded to 6 decimals"
+    assert abs(gx) <= 1e-6, f"gamma_exog {gx} is too high"
