@@ -1,6 +1,7 @@
 import math
 from contextlib import suppress
-from typing import Sequence
+from pathlib import Path
+from typing import IO, Sequence
 
 import altair as alt
 import pandas as pd
@@ -206,7 +207,12 @@ def compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | Non
     return estimates
 
 
-def build_events_features(plot_df: pd.DataFrame, lam: float, theta: float, ad_file):
+def build_events_features(
+    plot_df: pd.DataFrame,
+    lam: float,
+    theta: float,
+    ad_file: str | Path | IO[str] | IO[bytes] | None,
+):
     """Build monthly covariates/features from Events and optional ad spend.
 
     This function encodes the app's Events table into time-aligned monthly
@@ -285,10 +291,27 @@ def build_events_features(plot_df: pd.DataFrame, lam: float, theta: float, ad_fi
     ad_spend = pd.Series(0.0, index=monthly_index, name="ad_spend")
     if ad_file is not None:
         try:
-            if ad_file.name.lower().endswith((".xlsx", ".xls")):
-                ad_df = pd.read_excel(ad_file)
+            # Accept path-like strings or file-like objects
+            if isinstance(ad_file, (str, Path)):
+                suffix = (Path(ad_file).suffix or "").lower()
+                if suffix in {".xlsx", ".xls"}:
+                    ad_df = pd.read_excel(ad_file)
+                else:
+                    ad_df = pd.read_csv(ad_file)
             else:
-                ad_df = pd.read_csv(ad_file)
+                # File-like: use extension hint if available; otherwise try CSV then Excel
+                name = getattr(ad_file, "name", "")
+                if isinstance(name, str) and name.lower().endswith((".xlsx", ".xls")):
+                    ad_df = pd.read_excel(ad_file)
+                else:
+                    with suppress(Exception):
+                        ad_file.seek(0)
+                    try:
+                        ad_df = pd.read_csv(ad_file)
+                    except Exception:
+                        with suppress(Exception):
+                            ad_file.seek(0)
+                        ad_df = pd.read_excel(ad_file)
             if {"date", "spend"}.issubset(ad_df.columns):
                 ad_df = ad_df.assign(date=lambda d: pd.to_datetime(d["date"]))
                 ad_df = ad_df.dropna(subset=["date"])
