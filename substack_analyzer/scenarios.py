@@ -122,6 +122,196 @@ def realistic_growth_profiles_cases() -> list[dict]:
     ]
 
 
+def top_tier_sustained_marketing_series() -> pd.Series:
+    params = scenario_top_tier_sustained_marketing()
+    idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
+    vals = [
+        15000,
+        15600,
+        16300,
+        17100,
+        18000,
+        19000,
+        20100,
+        21300,
+        22600,
+        24000,
+        25500,
+        27100,
+        28800,
+        30600,
+        32500,
+        34500,
+        36600,
+        38800,
+        41100,
+        43500,
+        46000,
+        48600,
+        51300,
+        54100,
+        57000,
+        60000,
+        63100,
+        66300,
+        69600,
+        73000,
+        76500,
+        80100,
+        83800,
+        87600,
+        91500,
+        95500,
+        99600,
+        103800,
+        108100,
+        112500,
+        117000,
+        121600,
+        126300,
+        131100,
+        136000,
+        141000,
+        146100,
+        151300,
+    ]
+    return pd.Series(vals, index=idx)
+
+
+def small_breakout_series() -> pd.Series:
+    params = scenario_small_breakout()
+    idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
+    vals = [
+        300,
+        305,
+        310,
+        316,
+        322,
+        329,
+        336,
+        344,
+        352,
+        361,
+        370,
+        380,
+        391,
+        403,
+        416,
+        430,
+        445,
+        461,
+        478,
+        496,
+        515,
+        535,
+        556,
+        578,
+        601,
+        625,
+        650,
+        676,
+        703,
+        731,
+        800,
+        880,
+        970,
+        1070,
+        1180,
+        1300,
+        1430,
+        1570,
+        1720,
+        1880,
+        2050,
+        2230,
+        2420,
+    ]
+    return pd.Series(vals, index=idx)
+
+
+def niche_steady_series() -> pd.Series:
+    params = scenario_niche_steady()
+    idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
+    vals = [
+        800,
+        812,
+        824,
+        836,
+        848,
+        861,
+        874,
+        887,
+        901,
+        915,
+        929,
+        944,
+        959,
+        974,
+        990,
+        1006,
+        1022,
+        1039,
+        1056,
+        1073,
+        1091,
+        1109,
+        1127,
+        1146,
+        1165,
+        1184,
+        1204,
+        1224,
+        1244,
+        1265,
+        1286,
+        1307,
+        1329,
+        1351,
+        1373,
+        1396,
+        1419,
+    ]
+    return pd.Series(vals, index=idx)
+
+
+def mid_sized_seasonal_conference_series() -> pd.Series:
+    params = scenario_mid_sized_seasonal_conference()
+    idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
+    vals = [
+        2500,
+        2550,
+        2600,
+        2660,
+        2720,
+        2790,
+        2870,
+        2960,
+        3060,
+        3170,
+        3290,
+        3420,
+        3560,
+        3710,
+        3870,
+        4040,
+        4220,
+        4410,
+        4610,
+        4820,
+        5040,
+        5270,
+        5510,
+        5760,
+        6020,
+        6290,
+        6570,
+        6860,
+        7160,
+        7470,
+    ]
+    return pd.Series(vals, index=idx)
+
+
 def gm_series_values() -> pd.Series:
     """
     Fixed 'gm' series used in tests; breakpoints are typically detected automatically.
@@ -219,7 +409,7 @@ def exog_with_nans_series_and_exog() -> tuple[pd.Series, pd.Series]:
     for d in exog_deltas:
         s_vals.append(s_vals[-1] + d)
     s = pd.Series(s_vals, index=idx)
-    exog_series = pd.Series([0.0, 1.0, pd.NA, 1.0, 0.0, 1.0, 0.0], index=idx[1:], dtype="Float64")
+    exog_series = pd.Series([0.0, pd.NA, 1.0, 0.0, 1.0, 0.0, 1.0], index=idx)
     return s, exog_series.astype(float)
 
 

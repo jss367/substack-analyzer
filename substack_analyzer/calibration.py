@@ -23,6 +23,32 @@ def _segments_from_breakpoints(n: int, breakpoints: Sequence[int]) -> list[tuple
 
 
 def _event_regressors(index: pd.DatetimeIndex, events_df: pd.DataFrame | None) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Build pulse and step event regressors aligned to the deltas index.
+
+    Parameters
+    ----------
+    index : pd.DatetimeIndex
+        Month-end index corresponding to ΔS_t rows (i.e., original series index[1:]).
+    events_df : pd.DataFrame | None
+        Optional events table. Expected columns:
+        - 'date': event month (any parseable datetime); normalized to month-end
+        - 'persistence': one of {'persistent', 'transient', 'no effect'} (case-insensitive)
+        - 'cost' (optional): numeric weight applied to the event (defaults to 1.0)
+
+    Behavior
+    --------
+    - Dates are coerced to month-end.
+    - 'persistent': contributes to a step regressor from event month onward.
+    - 'transient': contributes to a pulse regressor at the event month only.
+    - 'no effect' or missing/invalid rows are ignored.
+    - 'cost' scales the magnitude of the contribution when present.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        (pulse, step), each length len(index), dtype float.
+    """
     if events_df is None or events_df.empty:
         return np.zeros(len(index)), np.zeros(len(index))
     df = events_df.dropna(subset=["date"]).copy()

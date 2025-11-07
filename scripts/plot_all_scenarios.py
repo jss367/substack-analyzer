@@ -13,34 +13,45 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from substack_analyzer.analysis import build_events_features
-from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_from_params
+from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.changepoints import breakpoints_for_segments, detect_and_classify
 from substack_analyzer.plot_utils import plot_fit_vs_actual
-from substack_analyzer.scenarios import cy_series_values, gm_series_values, realistic_growth_profiles_cases
+from substack_analyzer.scenarios import (
+    cy_series_values,
+    gm_series_values,
+    mid_sized_seasonal_conference_series,
+    niche_steady_series,
+    one_time_spike_series_and_events,
+    small_breakout_series,
+    top_tier_sustained_marketing_series,
+)
 from substack_analyzer.utils import ad_spend_csv_with_spikes, synthesize_series_with_exog
 
 
-def _build_realistic_case_subplot(ax: plt.Axes, case: dict) -> None:
-    idx = pd.period_range("2020-01", periods=case["months"], freq="M").to_timestamp("M")
-    base_series = pd.Series([case["start"]] * len(idx), index=idx)
-    events_df = case["events"](idx)
-    total_series = fitted_series_from_params(
-        total_series=base_series,
-        breakpoints=case["breakpoints"],
-        carrying_capacity=case["carrying_capacity"],
-        segment_growth_rates=case["segment_rates"],
-        events_df=events_df,
-        gamma_pulse=case["gamma_pulse"],
-        gamma_step=case["gamma_step"],
-    )
-    fit = fit_piecewise_logistic(
-        total_series,
-        breakpoints=case["breakpoints"],
-        events_df=events_df,
-        k_grid=[case["carrying_capacity"]],
-    )
-    title = f"{case['description']}\nK={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(total_series, fit, title=title, show_breakpoints=True, ax=ax, show=False)
+def _build_series_with_bkps(ax: plt.Axes, title: str, series: pd.Series, bkps: list[int] | None) -> None:
+    fit = fit_piecewise_logistic(series, breakpoints=bkps or [])
+    subtitle = f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    plot_fit_vs_actual(series, fit, title=f"{title}\n{subtitle}", show_breakpoints=True, ax=ax, show=False)
+
+
+def _build_top_tier_subplot(ax: plt.Axes) -> None:
+    series = top_tier_sustained_marketing_series()
+    _build_series_with_bkps(ax, "top_tier_sustained_marketing", series, [12, 24, 36])
+
+
+def _build_small_breakout_subplot(ax: plt.Axes) -> None:
+    series = small_breakout_series()
+    _build_series_with_bkps(ax, "small_breakout", series, [18, 30])
+
+
+def _build_niche_steady_subplot(ax: plt.Axes) -> None:
+    series = niche_steady_series()
+    _build_series_with_bkps(ax, "niche_steady", series, [])
+
+
+def _build_mid_sized_subplot(ax: plt.Axes) -> None:
+    series = mid_sized_seasonal_conference_series()
+    _build_series_with_bkps(ax, "mid_sized_seasonal_conference", series, [10, 20])
 
 
 def _build_gm_series_subplot(ax: plt.Axes) -> None:
@@ -49,7 +60,8 @@ def _build_gm_series_subplot(ax: plt.Axes) -> None:
     bkps = breakpoints_for_segments(classified)
     fit = fit_piecewise_logistic(series, breakpoints=bkps)
     title = (
-        f"gm_series (auto bkps {bkps})\nK={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+        f"gm_series (auto bkps {bkps})\n"
+        f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
     )
     plot_fit_vs_actual(series, fit, title=title, show_breakpoints=True, ax=ax, show=False)
 
@@ -57,7 +69,7 @@ def _build_gm_series_subplot(ax: plt.Axes) -> None:
 def _build_cy_series_subplot(ax: plt.Axes) -> None:
     series, bkps = cy_series_values()
     fit = fit_piecewise_logistic(series, breakpoints=bkps)
-    title = f"cy_series (bkps {bkps})\nK={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    title = f"cy_series (bkps {bkps})\n" f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
     plot_fit_vs_actual(series, fit, title=title, show_breakpoints=True, ax=ax, show=False)
 
 
@@ -72,19 +84,30 @@ def _build_phase1_ads_spiky_subplot(ax: plt.Axes) -> None:
     exog = features_df["ad_effect_log"].astype(float)
     total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=100.0)
     fit = fit_piecewise_logistic(total_series=total, breakpoints=[], events_df=None, extra_exog=exog)
-    gamma_exog_str = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
-    title = f"ads_spiky_spend\nγ_exog={gamma_exog_str}, R2Δ={fit.r2_on_deltas:.3f}"
+    gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
+    title = f"ads_spiky_spend\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
     plot_fit_vs_actual(total, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+
+
+def _build_one_time_spike_subplot(ax: plt.Axes) -> None:
+    series, events = one_time_spike_series_and_events()
+    fit = fit_piecewise_logistic(series, breakpoints=[], events_df=events)
+    title = f"one_time_spike (events)\n" f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
 def main() -> None:
     # Assemble subplot specifications
-    builders: list[tuple[str, callable]] = []
-    for case in realistic_growth_profiles_cases():
-        builders.append((case["description"], lambda ax, case=case: _build_realistic_case_subplot(ax, case)))
-    builders.append(("gm_series", _build_gm_series_subplot))
-    builders.append(("cy_series", _build_cy_series_subplot))
-    builders.append(("ads_spiky_spend", _build_phase1_ads_spiky_subplot))
+    builders: list[tuple[str, callable]] = [
+        ("top_tier", _build_top_tier_subplot),
+        ("small_breakout", _build_small_breakout_subplot),
+        ("niche_steady", _build_niche_steady_subplot),
+        ("mid_sized", _build_mid_sized_subplot),
+        ("gm_series", _build_gm_series_subplot),
+        ("cy_series", _build_cy_series_subplot),
+        ("one_time_spike", _build_one_time_spike_subplot),
+        ("ads_spiky_spend", _build_phase1_ads_spiky_subplot),
+    ]
 
     n = len(builders)
     cols = 2

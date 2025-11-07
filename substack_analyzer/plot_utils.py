@@ -16,7 +16,7 @@ def plot_fit_vs_actual(
     title: str | None = None,
     show_breakpoints: bool = True,
     ax: plt.Axes | None = None,
-    show: bool = True,
+    show: bool = False,
 ):
     """Overlay actual `input_series` and fitted series using matplotlib.
 
@@ -76,6 +76,6 @@ def plot_fit_vs_actual(
     ax.legend()
     plt.tight_layout()
     plt.savefig("fit_vs_actual.png")
-    if show:
-        plt.show()
+    # if show:
+    #     plt.show()
     return ax

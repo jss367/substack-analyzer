@@ -197,11 +197,6 @@ def test_fit_piecewise_logistic_on_gm_series():
     ]
     idx = pd.period_range("2021-10", periods=len(vals), freq="M").to_timestamp("M")
     input_series = pd.Series(vals, index=idx)
-    # now plot the series
-    # import matplotlib.pyplot as plt
-
-    # plt.plot(input_series)
-    # plt.show()
 
     # Detect and classify, then use only segment-worthy breakpoints
     classified = detect_and_classify(input_series, max_changes=4, window=6)
@@ -238,10 +233,6 @@ def test_fit_piecewise_logistic_with_cy_series():
 
     bkps = [16]
     fit = fit_piecewise_logistic(input_series, breakpoints=bkps)
-
-    # from substack_analyzer.plot_utils import plot_fit_vs_actual
-
-    # plot_fit_vs_actual(input_series, fit)
 
     assert len(fit.fitted_series) == len(input_series)
     assert fit.carrying_capacity > input_series.max()
