@@ -471,7 +471,7 @@ def test_phase1_ads_really_valuable_phase1_json():
         idx[18]: 2000.0,  # another big campaign
     }
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
-    covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    _, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
 
     # Build Total series that actually uses exogenous effect (positive influence)
