@@ -1,10 +1,15 @@
+import pandas as pd
+
+from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.scenarios import (
     mid_sized_seasonal_conference_series,
     niche_steady_series,
     small_breakout_series,
+    test_phase1_ads_really_valuable_phase1_json,
     top_tier_sustained_marketing_series,
 )
+from substack_analyzer.utils import ad_spend_csv_for_index
 
 
 def test_top_tier_sustained_marketing_series_fit():
@@ -54,4 +59,28 @@ def test_mid_sized_seasonal_conference_series_fit():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 3
     assert fit.r2_on_deltas > 0.7
+    assert fit.sse >= 0.0
+
+
+def test_phase1_ads_really_valuable_fit_with_exog():
+    # Series synthesized with a strong exogenous ad-effect signal
+    series = test_phase1_ads_really_valuable_phase1_json()
+
+    # Rebuild the same exogenous feature used in the scenario
+    idx = series.index
+    plot_df = pd.DataFrame(index=idx)
+    lam = 0.5
+    theta = 500.0
+    ad_file = ad_spend_csv_for_index(idx, monthly_spend=5000.0)
+    _cov, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float)
+
+    # Fit with exogenous regressor; no structural breakpoints in this scenario
+    fit = fit_piecewise_logistic(series, breakpoints=[], extra_exog=exog)
+
+    assert len(fit.fitted_series) == len(series)
+    assert fit.carrying_capacity > float(series.max())
+    assert len(fit.segment_growth_rates) == 1
+    # Deterministic construction; should explain nearly all variance in deltas
+    assert fit.r2_on_deltas > 0.95
     assert fit.sse >= 0.0

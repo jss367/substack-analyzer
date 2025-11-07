@@ -4,6 +4,9 @@ Reusable scenario definitions for calibration tests and plotting tools.
 
 import pandas as pd
 
+from substack_analyzer.analysis import build_events_features
+from substack_analyzer.utils import ad_spend_csv_with_spikes, synthesize_series_with_exog
+
 
 def scenario_top_tier_sustained_marketing() -> dict:
     """
@@ -453,3 +456,47 @@ def two_segment_ordered_series() -> tuple[pd.Series, list[int]]:
     idx = pd.period_range("2023-01", periods=len(vals), freq="M").to_timestamp("M")
     s = pd.Series(vals, index=idx)
     return s, [5]
+
+
+def test_phase1_ads_really_valuable_phase1_json():
+    # Monthly timeline
+    idx = pd.period_range("2022-01", periods=36, freq="M").to_timestamp("M")
+    plot_df = pd.DataFrame(index=idx)
+
+    # Ad spend file (constant spend) -> features with ad_effect_log
+    lam = 0.5
+    theta = 500.0
+    spikes = {
+        idx[6]: 3000.0,  # mid-year push
+        idx[18]: 2000.0,  # another big campaign
+    }
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float)
+
+    # Build Total series that actually uses exogenous effect (positive influence)
+    total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=100.0)
+
+    return total
+
+
+def test_phase1_ads_have_no_effect_phase1_json():
+    # Monthly timeline
+    idx = pd.period_range("2022-01", periods=36, freq="M").to_timestamp("M")
+    plot_df = pd.DataFrame(index=idx)
+
+    # Ad spend present, but the synthesized series ignores exogenous effect (g_exog=0)
+    lam = 0.5
+    theta = 500.0
+    spikes = {
+        idx[6]: 3000.0,  # mid-year push
+        idx[18]: 2000.0,  # another big campaign
+    }
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    _covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float) * 0.0
+
+    # Build Total series without exogenous effect
+    total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=0.0)
+
+    return total

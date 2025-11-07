@@ -26,9 +26,10 @@ from substack_analyzer.scenarios import (
     niche_steady_series,
     one_time_spike_series_and_events,
     small_breakout_series,
+    test_phase1_ads_really_valuable_phase1_json,
     top_tier_sustained_marketing_series,
 )
-from substack_analyzer.utils import ad_spend_csv_with_spikes, synthesize_series_with_exog
+from substack_analyzer.utils import ad_spend_csv_for_index, ad_spend_csv_with_spikes, synthesize_series_with_exog
 
 
 def _build_series_with_bkps(ax: plt.Axes, title: str, series: pd.Series, bkps: list[int] | None) -> None:
@@ -91,6 +92,22 @@ def _build_phase1_ads_spiky_subplot(ax: plt.Axes) -> None:
     plot_fit_vs_actual(total, fit, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
+def _build_phase1_ads_valuable_subplot(ax: plt.Axes) -> None:
+    # Scenario with constant monthly ad spend whose effect is modeled via exogenous features
+    series = test_phase1_ads_really_valuable_phase1_json()
+    idx = series.index
+    plot_df = pd.DataFrame(index=idx)
+    lam = 0.5
+    theta = 500.0
+    ad_file = ad_spend_csv_for_index(idx, monthly_spend=5000.0)
+    _covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float)
+    fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
+    gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
+    title = f"ads really valuable\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
+    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+
+
 def _build_one_time_spike_subplot(ax: plt.Axes) -> None:
     series, events = one_time_spike_series_and_events()
     fit = fit_piecewise_logistic(series, breakpoints=[], events_df=events)
@@ -109,6 +126,7 @@ def main() -> None:
         ("cy_series", _build_cy_series_subplot),
         ("one_time_spike", _build_one_time_spike_subplot),
         ("ads_spiky_spend", _build_phase1_ads_spiky_subplot),
+        ("ads_constant_spend", _build_phase1_ads_valuable_subplot),
     ]
 
     n = len(builders)
