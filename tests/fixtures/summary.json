@@ -1,0 +1,34 @@
+{
+  "breakpoints": [
+    10,
+    22
+  ],
+  "detect_on": "both",
+  "breakpoints_total": [
+    22
+  ],
+  "breakpoints_paid": [
+    10,
+    22
+  ],
+  "carrying_capacity": 61146.114,
+  "segment_growth_rates": [
+    0.23794266232059622,
+    0.25417238357831134,
+    0.18222120523458776
+  ],
+  "gamma_pulse": 0.0,
+  "gamma_step": 0.0,
+  "gamma_exog": 0.0,
+  "gamma_intercept": 2.9755717864151956,
+  "sse": 3951519.8421442024,
+  "r2_on_deltas": 0.18323617689426874,
+  "estimates": {
+    "start_free": 6051,
+    "start_premium": 63,
+    "organic_growth": 0.1709822098119872,
+    "conv_ongoing": 0.0023289630448065724,
+    "churn_free": 0.01,
+    "churn_prem": 0.01
+  }
+}

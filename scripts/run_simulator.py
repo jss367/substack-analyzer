@@ -179,9 +179,7 @@ def run(
     if fit_params is not None:
         K = float(fit_params.get("carrying_capacity", 0.0))
         r_list = [float(x) for x in (fit_params.get("segment_growth_rates") or [])]
-        bkps = [int(b) for b in (fit_params.get("breakpoints") or [])]
-        gamma_pulse = float(fit_params.get("gamma_pulse", 0.0))
-        gamma_step = float(fit_params.get("gamma_step", 0.0))
+        # Unused here: breakpoints and gamma_pulse/step (kept for compatibility)
         gamma_exog = fit_params.get("gamma_exog")
         gamma_intercept = float(fit_params.get("gamma_intercept", 0.0))
 
@@ -238,11 +236,95 @@ def run(
         logger.info("Fitted-equation forecast saved: %s", str(out_fit.resolve()))
 
 
-def _col_arg(s: str) -> str | int:
-    try:
-        return int(s)
-    except (ValueError, TypeError):
-        return s
+def _parse_phase2_config(p1: dict) -> dict:
+    """
+    Parse optional Phase 2 config embedded in phase1.json under key "phase2".
+
+    Supported schema examples:
+    {
+      "phase2": {
+        "horizon": 60,
+        "cac": 2.0,
+        "ad_fee": 0.0,
+        "price_monthly": 10.0,
+        "annual_share": 0.0,
+        "schedule": {"type": "const", "amount": 5000}
+      }
+    }
+    or
+    {
+      "phase2": {
+        "horizon": 36,
+        "schedule": {"type": "once", "amount": 1000, "once_month": 1}
+      }
+    }
+    or
+    {
+      "phase2": {
+        "horizon": 60,
+        "schedule": {"type": "two_stage", "stage1": 5000, "stage2": 2000}
+      }
+    }
+    """
+    cfg = (p1 or {}).get("phase2") or {}
+    horizon = int(cfg.get("horizon", 60))
+    cac = float(cfg.get("cac", 2.0))
+    ad_fee = float(cfg.get("ad_fee", 0.0))
+    price_monthly = float(cfg.get("price_monthly", 10.0))
+    annual_share = float(cfg.get("annual_share", 0.0))
+
+    sched = cfg.get("schedule") or {}
+    sched_type = (sched.get("type") or "const").lower()
+    spend_const = spend_stage1 = spend_stage2 = spend_once = None
+    once_month = int(sched.get("once_month", 1))
+    if sched_type == "const":
+        spend_const = float(sched.get("amount", 0.0))
+    elif sched_type in ("one_time", "once"):
+        spend_once = float(sched.get("amount", 0.0))
+    elif sched_type in ("two_stage", "two-stage"):
+        spend_stage1 = float(sched.get("stage1", 0.0))
+        spend_stage2 = float(sched.get("stage2", 0.0))
+
+    return {
+        "horizon": horizon,
+        "cac": cac,
+        "ad_fee": ad_fee,
+        "price_monthly": price_monthly,
+        "annual_share": annual_share,
+        "spend_const": spend_const,
+        "spend_stage1": spend_stage1,
+        "spend_stage2": spend_stage2,
+        "spend_once": spend_once,
+        "once_month": once_month,
+    }
+
+
+def run_with_phase1(phase1_path: str, out_dir: str, from_out_dir: str | None = None) -> None:
+    """
+    Convenience entrypoint: pass only a phase1.json path (with optional embedded
+    "phase2" configuration) and an output directory. This avoids specifying a
+    long list of parameters.
+    """
+    p1 = _read_phase1(Path(phase1_path))
+    cfg = _parse_phase2_config(p1)
+
+    # Delegate to main run() using parameters derived from phase1.json
+    run(
+        summary_path=None,
+        phase1_path=phase1_path,
+        from_out_dir=from_out_dir,
+        out_dir=out_dir,
+        spend_const=cfg["spend_const"],
+        spend_stage1=cfg["spend_stage1"],
+        spend_stage2=cfg["spend_stage2"],
+        spend_once=cfg["spend_once"],
+        once_month=cfg["once_month"],
+        horizon=cfg["horizon"],
+        cac=cfg["cac"],
+        ad_fee=cfg["ad_fee"],
+        price_monthly=cfg["price_monthly"],
+        annual_share=cfg["annual_share"],
+    )
 
 
 def main() -> None:

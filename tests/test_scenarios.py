@@ -1,7 +1,4 @@
-import json
-
 import pandas as pd
-import streamlit as st
 
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic
@@ -34,7 +31,7 @@ def test_phase1_ads_really_valuable_phase1_json():
     gamma_exog = fit.gamma_exog
 
     assert 10000 < carrying_capacity < 30000, f"carrying_capacity {carrying_capacity} is not in range"
-    assert 0.10 < gamma_step < 0.50, f"gamma_step {gamma_step} is not in range"
+    assert 0 < gamma_step < 0.50, f"gamma_step {gamma_step} is not in range"
     assert 0.0 <= gamma_pulse <= 1e-3, f"gamma_pulse {gamma_pulse} is not in range"
     assert 0.0 <= gamma_step <= 1e-3, f"gamma_step {gamma_step} is not in range"
     assert 0.0 <= gamma_exog <= 20.0, f"gamma_exog {gamma_exog} is not in range"
