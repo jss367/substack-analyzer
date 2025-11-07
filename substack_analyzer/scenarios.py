@@ -220,7 +220,6 @@ def small_breakout_series() -> pd.Series:
         1300,
         1430,
         1570,
-        1720,
         1880,
         2050,
         2230,
@@ -259,7 +258,7 @@ def niche_steady_series() -> pd.Series:
         1146,
         1165,
         1184,
-        1204,
+        1234,
         1224,
         1244,
         1265,
@@ -268,8 +267,7 @@ def niche_steady_series() -> pd.Series:
         1329,
         1351,
         1373,
-        1396,
-        1419,
+        1370,
     ]
     return pd.Series(vals, index=idx)
 

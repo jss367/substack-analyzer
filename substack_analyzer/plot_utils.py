@@ -75,7 +75,6 @@ def plot_fit_vs_actual(
     ax.grid(True, linestyle=":", alpha=0.5)
     ax.legend()
     plt.tight_layout()
-    plt.savefig("fit_vs_actual.png")
     # if show:
     #     plt.show()
     return ax

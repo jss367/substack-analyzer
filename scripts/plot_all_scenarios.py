@@ -9,6 +9,9 @@ Output: outputs/all_test_calibration_fits.png
 import math
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -60,8 +63,7 @@ def _build_gm_series_subplot(ax: plt.Axes) -> None:
     bkps = breakpoints_for_segments(classified)
     fit = fit_piecewise_logistic(series, breakpoints=bkps)
     title = (
-        f"gm_series (auto bkps {bkps})\n"
-        f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+        f"gm_series (auto bkps {bkps})\nK={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
     )
     plot_fit_vs_actual(series, fit, title=title, show_breakpoints=True, ax=ax, show=False)
 
