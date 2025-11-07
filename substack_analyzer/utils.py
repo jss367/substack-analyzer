@@ -32,8 +32,52 @@ def synthesize_series_with_exog(
     g_exog: float = 0.0,
 ) -> pd.Series:
     """
-    Build a simple logistic-like series with optional additive exogenous effect on deltas.
-    Deterministic (no noise) for test stability.
+    Build a simple logistic-like series with an optional additive exogenous effect on
+    month-to-month changes (deltas). Deterministic (no noise) for test stability.
+
+    Dynamics
+    --------
+    For t >= 1, the increment is computed as:
+
+        delta_t = r * s_{t-1} * (1 - s_{t-1} / K) + g_exog * exog_{t-1}
+
+    and the level updates as:
+
+        s_t = max(s_{t-1} + delta_t, 0)
+
+    Notes on exogenous input
+    ------------------------
+    - exog is reindexed to `idx`, coerced to float, and NaNs filled with 0.0.
+    - The exogenous term at time t uses the previous month's value exog_{t-1} to
+      keep the update causal (no peeking ahead).
+    - If `exog` is None (or effectively all zeros) or `g_exog == 0.0`, the model
+      reduces to a pure logistic update with carrying capacity K and intrinsic
+      growth parameter r.
+
+    Choosing g_exog
+    ---------------
+    - When `exog` is a small-scale feature like log(1 + adstock/theta) (typical
+      range ~0–3), values of `g_exog` in the 50–150 range produce a noticeable but
+      stable influence in synthetic tests. Use larger values cautiously.
+
+    Parameters
+    ----------
+    idx : pd.DatetimeIndex
+        Monthly index on which the series is generated.
+    K : float
+        Carrying capacity in the logistic term.
+    r : float
+        Intrinsic growth coefficient in the logistic term.
+    exog : pd.Series | None
+        Optional exogenous driver aligned to `idx`. Its magnitude is scaled by
+        `g_exog` and added to the monthly delta.
+    g_exog : float, default 0.0
+        Linear gain applied to the exogenous driver. Set to 0.0 to ignore exog.
+
+    Returns
+    -------
+    pd.Series
+        Generated series named "Total", integer-rounded for readability.
     """
     s_vals: list[float] = [1000.0]
     exog_vals = exog.reindex(idx).astype(float).fillna(0.0).to_numpy() if exog is not None else np.zeros(len(idx))
@@ -42,14 +86,6 @@ def synthesize_series_with_exog(
         delta = r * x + g_exog * float(exog_vals[t - 1])
         s_vals.append(max(s_vals[-1] + delta, 0.0))
     return pd.Series(np.asarray(s_vals, dtype=float), index=idx, name="Total").round().astype(int)
-
-
-def ad_spend_csv_for_index(idx: pd.DatetimeIndex, monthly_spend: float) -> str:
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".csv", delete=False, encoding="utf-8") as f:
-        f.write("date,spend\n")
-        for d in idx:
-            f.write(f"{d.date()},{monthly_spend}\n")
-        return f.name
 
 
 def ad_spend_csv_with_spikes(idx: pd.DatetimeIndex, spikes: dict) -> str:

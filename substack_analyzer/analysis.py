@@ -209,9 +209,9 @@ def compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | Non
 
 def build_events_features(
     plot_df: pd.DataFrame,
-    lam: float,
-    theta: float,
-    ad_file: str | Path | IO[str] | IO[bytes] | None,
+    lam: float = 0.1,
+    theta: float = 100.0,
+    ad_file: str | Path | IO[str] | IO[bytes] | None = None,
 ):
     """Build monthly covariates/features from Events and optional ad spend.
 

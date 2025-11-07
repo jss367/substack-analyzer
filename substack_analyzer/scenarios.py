@@ -464,18 +464,45 @@ def test_phase1_ads_really_valuable_phase1_json():
     plot_df = pd.DataFrame(index=idx)
 
     # Ad spend file (constant spend) -> features with ad_effect_log
-    lam = 0.5
-    theta = 500.0
     spikes = {
         idx[6]: 3000.0,  # mid-year push
         idx[18]: 2000.0,  # another big campaign
     }
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
-    _, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    _, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
 
     # Build Total series that actually uses exogenous effect (positive influence)
-    total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=100.0)
+    total = synthesize_series_with_exog(idx, K=20000.0, r=0.03, exog=exog, g_exog=0)
+
+    return total
+
+
+def test_phase1_ads_extremely_valuable_phase1_json():
+    """
+    Scenario: almost no organic growth without ads, but enormous growth driven by ads.
+
+    Implementation details:
+    - Organic growth rate r is set very low (≈0.001), so logistic term alone barely moves.
+    - Constant monthly ad spend is applied to generate a sustained exogenous driver.
+    - Exogenous gain g_exog is set ~10x higher than a "typical" strong value to create
+      an outsized ad-driven effect.
+    """
+    # Monthly timeline
+    idx = pd.period_range("2022-01", periods=36, freq="M").to_timestamp("M")
+    plot_df = pd.DataFrame(index=idx)
+
+    # Spiky ad spend: exactly two large campaigns
+    spikes = {
+        idx[6]: 15000.0,
+        idx[18]: 20000.0,
+    }
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float)
+
+    # Build Total series: negligible organic (r very small), extreme exogenous gain
+    total = synthesize_series_with_exog(idx, K=20000.0, r=0.001, exog=exog, g_exog=1000.0)
 
     return total
 
@@ -486,14 +513,12 @@ def test_phase1_ads_have_no_effect_phase1_json():
     plot_df = pd.DataFrame(index=idx)
 
     # Ad spend present, but the synthesized series ignores exogenous effect (g_exog=0)
-    lam = 0.5
-    theta = 500.0
     spikes = {
         idx[6]: 3000.0,  # mid-year push
         idx[18]: 2000.0,  # another big campaign
     }
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
-    _covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float) * 0.0
 
     # Build Total series without exogenous effect

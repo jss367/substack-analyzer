@@ -10,8 +10,6 @@ import math
 from pathlib import Path
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -26,10 +24,14 @@ from substack_analyzer.scenarios import (
     niche_steady_series,
     one_time_spike_series_and_events,
     small_breakout_series,
+    test_phase1_ads_extremely_valuable_phase1_json,
+    test_phase1_ads_have_no_effect_phase1_json,
     test_phase1_ads_really_valuable_phase1_json,
     top_tier_sustained_marketing_series,
 )
-from substack_analyzer.utils import ad_spend_csv_for_index, ad_spend_csv_with_spikes, synthesize_series_with_exog
+from substack_analyzer.utils import ad_spend_csv_with_spikes, synthesize_series_with_exog
+
+matplotlib.use("Agg")
 
 
 def _build_series_with_bkps(ax: plt.Axes, title: str, series: pd.Series, bkps: list[int] | None) -> None:
@@ -79,11 +81,9 @@ def _build_cy_series_subplot(ax: plt.Axes) -> None:
 def _build_phase1_ads_spiky_subplot(ax: plt.Axes) -> None:
     idx = pd.period_range("2022-01", periods=36, freq="M").to_timestamp("M")
     plot_df = pd.DataFrame(index=idx)
-    lam = 0.5
-    theta = 500.0
     spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
-    _covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
     total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=100.0)
     fit = fit_piecewise_logistic(total_series=total, breakpoints=[], events_df=None, extra_exog=exog)
@@ -97,14 +97,43 @@ def _build_phase1_ads_valuable_subplot(ax: plt.Axes) -> None:
     series = test_phase1_ads_really_valuable_phase1_json()
     idx = series.index
     plot_df = pd.DataFrame(index=idx)
-    lam = 0.5
-    theta = 500.0
-    ad_file = ad_spend_csv_for_index(idx, monthly_spend=5000.0)
-    _covariates_df, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
     fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
     gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
     title = f"ads really valuable\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
+    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+
+
+def _build_phase1_ads_no_effect_subplot(ax: plt.Axes) -> None:
+    # Scenario with ad spend present but total ignores exogenous effect
+    series = test_phase1_ads_have_no_effect_phase1_json()
+    idx = series.index
+    plot_df = pd.DataFrame(index=idx)
+    spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float)
+    fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
+    gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
+    title = f"ads no effect\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
+    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+
+
+def _build_phase1_ads_extremely_valuable_subplot(ax: plt.Axes) -> None:
+    # Scenario with negligible organic growth but massive ad-driven growth
+    series = test_phase1_ads_extremely_valuable_phase1_json()
+    idx = series.index
+    plot_df = pd.DataFrame(index=idx)
+    spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float)
+    fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
+    gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
+    title = f"ads extremely valuable\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
     plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
@@ -127,6 +156,8 @@ def main() -> None:
         ("one_time_spike", _build_one_time_spike_subplot),
         ("ads_spiky_spend", _build_phase1_ads_spiky_subplot),
         ("ads_constant_spend", _build_phase1_ads_valuable_subplot),
+        ("ads_no_effect", _build_phase1_ads_no_effect_subplot),
+        ("ads_extreme_value", _build_phase1_ads_extremely_valuable_subplot),
     ]
 
     n = len(builders)

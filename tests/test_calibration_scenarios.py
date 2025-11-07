@@ -9,7 +9,7 @@ from substack_analyzer.scenarios import (
     test_phase1_ads_really_valuable_phase1_json,
     top_tier_sustained_marketing_series,
 )
-from substack_analyzer.utils import ad_spend_csv_for_index
+from substack_analyzer.utils import ad_spend_csv_with_spikes
 
 
 def test_top_tier_sustained_marketing_series_fit():
@@ -69,10 +69,9 @@ def test_phase1_ads_really_valuable_fit_with_exog():
     # Rebuild the same exogenous feature used in the scenario
     idx = series.index
     plot_df = pd.DataFrame(index=idx)
-    lam = 0.5
-    theta = 500.0
-    ad_file = ad_spend_csv_for_index(idx, monthly_spend=5000.0)
-    _cov, features_df = build_events_features(plot_df, lam=lam, theta=theta, ad_file=ad_file)
+    spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    _cov, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
 
     # Fit with exogenous regressor; no structural breakpoints in this scenario
