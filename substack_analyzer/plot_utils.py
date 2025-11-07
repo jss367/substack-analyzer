@@ -15,6 +15,8 @@ def plot_fit_vs_actual(
     fit: PiecewiseLogisticFit,
     title: str | None = None,
     show_breakpoints: bool = True,
+    ax: plt.Axes | None = None,
+    show: bool = True,
 ):
     """Overlay actual `input_series` and fitted series using matplotlib.
 
@@ -45,7 +47,12 @@ def plot_fit_vs_actual(
     if title is None:
         title = f"Actual vs Fitted (R^2 on deltas: {fit.r2_on_deltas:.3f}, SSE: {fit.sse:,.0f})"
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+    created_fig = False
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        created_fig = True
+    else:
+        fig = ax.figure
     ax.plot(actual.index, actual.values, marker="o", linewidth=1.8, label="Actual", color="#1f77b4")
     ax.plot(actual.index, fitted.values, marker="o", linewidth=1.8, label="Fitted", color="#2ca02c")
 
@@ -68,5 +75,7 @@ def plot_fit_vs_actual(
     ax.grid(True, linestyle=":", alpha=0.5)
     ax.legend()
     plt.tight_layout()
-    plt.show()
+    plt.savefig("fit_vs_actual.png")
+    if show:
+        plt.show()
     return ax

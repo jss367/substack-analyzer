@@ -6,7 +6,7 @@ import streamlit as st
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.persistence import export_phase_one_json
-from tests.utils_for_tests import ad_spend_csv_for_index, synthesize_series_with_exog
+from substack_analyzer.utils import ad_spend_csv_for_index, synthesize_series_with_exog
 
 
 def test_phase1_ads_really_valuable_phase1_json():
