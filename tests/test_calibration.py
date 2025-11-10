@@ -5,6 +5,7 @@ import streamlit as st
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_from_params, forecast_piecewise_logistic
 from substack_analyzer.changepoints import breakpoints_for_segments, detect_and_classify
+from substack_analyzer.scenarios import gm_series_values
 from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes, synthesize_series_with_exog
 
 
@@ -145,58 +146,7 @@ def test_fit_piecewise_logistic_three_breaks_mixed_persistence_events():
 
 def test_fit_piecewise_logistic_on_gm_series():
 
-    vals = [
-        0,
-        0,
-        0,
-        2,
-        3,
-        4,
-        4,
-        4,
-        4,
-        5,
-        7,
-        30,
-        31,
-        31,
-        32,
-        33,
-        33,
-        33,
-        33,
-        35,
-        36,
-        36,
-        35,
-        36,
-        39,
-        42,
-        42,
-        44,
-        45,
-        45,
-        47,
-        50,
-        56,
-        60,
-        82,
-        93,
-        104,
-        109,
-        108,
-        116,
-        121,
-        124,
-        128,
-        128,
-        131,
-        134,
-        133,
-        134,
-    ]
-    idx = pd.period_range("2021-10", periods=len(vals), freq="M").to_timestamp("M")
-    input_series = pd.Series(vals, index=idx)
+    input_series = gm_series_values()
 
     # Detect and classify, then use only segment-worthy breakpoints
     classified = detect_and_classify(input_series, max_changes=4, window=6)

@@ -125,6 +125,18 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "subProcess": true
+        },
+        {
+            "name": "Python: plot_all_scenarios.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/Users/julius/git/substack-analyzer/scripts/plot_all_scenarios.py",
+            "cwd": "/Users/julius/git/substack-analyzer",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "/Users/julius/git/substack-analyzer"
+            },
+            "justMyCode": true
         }
     ]
 }
