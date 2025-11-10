@@ -32,7 +32,7 @@ def test_phase1_ads_really_valuable_phase1_json():
     assert 10000 < carrying_capacity < 30000, f"carrying_capacity {carrying_capacity} is not in range"
     assert 0.0 <= gamma_step <= 0.50, f"gamma_step {gamma_step} is not in range"
     assert 0.0 <= gamma_pulse <= 1, f"gamma_pulse {gamma_pulse} is not in range"
-    assert 0.0 <= gamma_exog <= 20.0, f"gamma_exog {gamma_exog} is not in range"
+    assert 0.05 <= gamma_exog <= 20.0, f"gamma_exog {gamma_exog} is not in range"
 
 
 def test_phase1_ads_have_no_effect_phase1_json():
@@ -56,9 +56,11 @@ def test_phase1_ads_have_no_effect_phase1_json():
     gamma_pulse = fit.gamma_pulse
     gamma_step = fit.gamma_step
     gamma_exog = fit.gamma_exog
+    sse = fit.sse
 
     assert 100 <= carrying_capacity <= 30000, f"carrying_capacity {carrying_capacity} is not in range"
     assert -500.0 <= gamma_intercept <= 500.0, f"gamma_intercept {gamma_intercept} is not in range"
     assert 0.0 <= gamma_pulse <= 1e-3, f"gamma_pulse {gamma_pulse} is not in range"
     assert 0.0 <= gamma_step <= 1e-3, f"gamma_step {gamma_step} is not in range"
-    assert 0.0 <= gamma_exog <= 20.0, f"gamma_exog {gamma_exog} is not in range"
+    assert -1 <= gamma_exog <= 1, f"gamma_exog {gamma_exog} is not in range"
+    assert sse <= 200
