@@ -5,7 +5,7 @@ from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.detection import detect_change_points
 from substack_analyzer.scenarios import test_phase1_ads_have_no_effect_phase1_json as scenario_ads_no_effect
 from substack_analyzer.scenarios import test_phase1_ads_really_valuable_phase1_json as scenario_ads_really_valuable
-from substack_analyzer.utils import ad_spend_csv_with_spikes
+from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes
 
 
 def test_phase1_ads_really_valuable_phase1_json():
@@ -25,7 +25,6 @@ def test_phase1_ads_really_valuable_phase1_json():
     fit = fit_piecewise_logistic(total_series=total, breakpoints=bkps, events_df=None, extra_exog=exog)
 
     carrying_capacity = fit.carrying_capacity
-    gamma_intercept = fit.gamma_intercept
     gamma_pulse = fit.gamma_pulse
     gamma_step = fit.gamma_step
     gamma_exog = fit.gamma_exog

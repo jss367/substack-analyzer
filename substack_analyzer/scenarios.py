@@ -5,7 +5,7 @@ Reusable scenario definitions for calibration tests and plotting tools.
 import pandas as pd
 
 from substack_analyzer.analysis import build_events_features
-from substack_analyzer.utils import ad_spend_csv_with_spikes, synthesize_series_with_exog
+from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes, synthesize_series_with_exog
 
 
 def scenario_top_tier_sustained_marketing() -> dict:

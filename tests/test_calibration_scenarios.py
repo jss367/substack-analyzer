@@ -9,7 +9,7 @@ from substack_analyzer.scenarios import (
     test_phase1_ads_really_valuable_phase1_json,
     top_tier_sustained_marketing_series,
 )
-from substack_analyzer.utils import ad_spend_csv_with_spikes
+from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes
 
 
 def test_top_tier_sustained_marketing_series_fit():

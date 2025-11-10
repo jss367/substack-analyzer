@@ -5,7 +5,7 @@ import streamlit as st
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_from_params, forecast_piecewise_logistic
 from substack_analyzer.changepoints import breakpoints_for_segments, detect_and_classify
-from substack_analyzer.utils import ad_spend_csv_with_spikes, synthesize_series_with_exog
+from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes, synthesize_series_with_exog
 
 
 def test_fit_piecewise_logistic_minimal():
