@@ -272,7 +272,7 @@ def build_events_features(
         # Collapse duplicates so pulses/steps are not double-counted if the UI contains
         # multiple entries for the same month and persistence (e.g., from Total & Paid).
         ev2 = ev2.sort_values("date")
-        ev2 = ev2.drop_duplicates(subset=["date", "persistence"], keep="first")
+        ev2 = ev2.drop_duplicates(subset=ev2.columns.intersection(["date", "persistence"]).tolist(), keep="first")
         for _, r in ev2.iterrows():
             d = r.get("date")
             if pd.isna(d) or d not in monthly_index:
