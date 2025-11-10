@@ -30,6 +30,8 @@ def synthesize_series_with_exog(
     r: float,
     exog: pd.Series | None,
     g_exog: float = 0.0,
+    step: pd.Series | None = None,
+    g_step: float = 0.0,
 ) -> pd.Series:
     """
     Build a simple logistic-like series with an optional additive exogenous effect on
@@ -74,6 +76,16 @@ def synthesize_series_with_exog(
     g_exog : float, default 0.0
         Linear gain applied to the exogenous driver. Set to 0.0 to ignore exog.
 
+    Optional step input
+    -------------------
+    When ``step`` is provided, it is treated as a persistent regressor that
+    contributes ``g_step * step_{t-1}`` to each monthly delta. This mirrors the
+    "persistent" event feature used in the calibration routines.
+    step : pd.Series | None
+        Optional persistent regressor aligned to `idx`. Uses previous month's value.
+    g_step : float, default 0.0
+        Linear gain applied to the persistent regressor.
+
     Returns
     -------
     pd.Series
@@ -81,9 +93,10 @@ def synthesize_series_with_exog(
     """
     s_vals: list[float] = [1000.0]
     exog_vals = exog.reindex(idx).astype(float).fillna(0.0).to_numpy() if exog is not None else np.zeros(len(idx))
+    step_vals = step.reindex(idx).astype(float).fillna(0.0).to_numpy() if step is not None else np.zeros(len(idx))
     for t in range(1, len(idx)):
         x = s_vals[-1] * (1.0 - s_vals[-1] / float(K))
-        delta = r * x + g_exog * float(exog_vals[t - 1])
+        delta = r * x + g_exog * float(exog_vals[t - 1]) + g_step * float(step_vals[t - 1])
         s_vals.append(max(s_vals[-1] + delta, 0.0))
     return pd.Series(np.asarray(s_vals, dtype=float), index=idx, name="Total").round().astype(int)
 
