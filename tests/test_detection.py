@@ -1,6 +1,7 @@
 import pandas as pd
 
 from substack_analyzer.detection import compute_segment_slopes, detect_change_points, slope_around
+from substack_analyzer.scenarios import gm_series_values
 
 
 def test_compute_segment_slopes_basic():
@@ -116,3 +117,20 @@ def test_detect_change_points_with_cy_series():
     bkps = detect_change_points(input_series, max_changes=3, return_mode="indices")
     # make sure the breakpoint is within 2 of jump_index
     assert abs(bkps[0] - jump_index) <= 2
+
+
+def test_detect_change_points_gm_series_core_breaks_and_mapping():
+    """
+    Ensure detect_change_points finds core change points on the gm series and that
+    indices/timestamps return modes are consistent.
+    """
+    series = gm_series_values()
+    bkps_idx = detect_change_points(series, max_changes=4, return_mode="indices")
+    # Expect breaks near the two largest level/structure changes:
+    # - Large jump around index ~11 (…7 -> 30…)
+    # - Large jump/structural change around index ~34 (…60 -> 82…)
+    assert any(abs(i - 11) <= 1 for i in bkps_idx) or any(abs(i - 12) <= 1 for i in bkps_idx)
+    assert any(abs(i - 34) <= 1 for i in bkps_idx) or any(abs(i - 33) <= 1 for i in bkps_idx)
+    # Check timestamp mapping aligns exactly with indices selection
+    bkps_ts = detect_change_points(series, max_changes=4, return_mode="timestamps")
+    assert bkps_ts == [series.index[i] for i in bkps_idx]
