@@ -122,6 +122,7 @@ def test_e2e_walkthrough_headless():
         gamma_pulse=fit.gamma_pulse,
         gamma_step=fit.gamma_step,
         gamma_exog=fit.gamma_exog,
+        segment_intercepts=fit.segment_intercepts,
     )
     assert s_hat.index.equals(total.index)
     assert np.allclose(s_hat.values, fit.fitted_series.values, atol=1e-6)

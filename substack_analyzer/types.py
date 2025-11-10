@@ -12,6 +12,7 @@ class PiecewiseLogisticFit:
 
     carrying_capacity: float
     segment_growth_rates: list[float]
+    segment_intercepts: list[float]
     breakpoints: list[int]
     gamma_pulse: float
     gamma_step: float

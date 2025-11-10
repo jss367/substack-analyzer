@@ -149,6 +149,7 @@ def main() -> None:
         gamma_pulse=fit.gamma_pulse,
         gamma_step=fit.gamma_step,
         gamma_exog=fit.gamma_exog,
+        segment_intercepts=fit.segment_intercepts,
     )
     st.write("Recomputed fitted series aligned:", bool(s_hat.index.equals(total.index)))
     _assert(np.allclose(s_hat.values, fit.fitted_series.values, atol=1e-6), "Param refit mismatch")
