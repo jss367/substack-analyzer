@@ -160,7 +160,7 @@ def test_fit_piecewise_logistic_on_gm_series():
     assert len(fit.fitted_series) == len(input_series)
     assert fit.carrying_capacity > input_series.max()
     assert len(fit.segment_growth_rates) == (len(bkps) + 1 if bkps else 1)
-    assert fit.sse >= 0.0
+    assert fit.sse <= 1200
 
 
 def test_fit_piecewise_logistic_with_cy_series():
