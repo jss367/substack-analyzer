@@ -149,11 +149,19 @@ def fit_piecewise_logistic(
             mask[lo:hi] = 1.0
         masks.append(mask)
 
+    # Indicator masks for segment-specific intercept adjustments relative to the first segment
+    intercept_masks: list[np.ndarray] = []
+    if num_segments > 1:
+        for mask in masks[1:]:
+            intercept_masks.append(mask.copy())
+
     for K in k_grid:
         X_base = (s_lag * (1.0 - s_lag / K)).to_numpy().astype(float)
         # Build design matrix from precomputed masks
         X_cols: list[np.ndarray] = [(X_base * m) for m in masks]
-        X_cols.append(np.ones(n, dtype=float))  # intercept
+        X_cols.append(np.ones(n, dtype=float))  # global intercept baseline
+        for im in intercept_masks:
+            X_cols.append(im)
         X_cols.append(pulse)
         X_cols.append(step)
         if exog is not None:
@@ -174,35 +182,28 @@ def fit_piecewise_logistic(
         # Unpack parameters
         r_segments = [float(b) for b in beta[:num_segments]]
         gamma_intercept = float(beta[num_segments])
-        gamma_pulse = float(beta[num_segments + 1])
-        gamma_step = float(beta[num_segments + 2])
-        beta_offset = num_segments + 3
+        offset_count = max(num_segments - 1, 0)
+        offsets: list[float] = [0.0]
+        if offset_count:
+            start_idx = num_segments + 1
+            offsets.extend(float(beta[start_idx + i]) for i in range(offset_count))
+        gamma_pulse_idx = num_segments + 1 + offset_count
+        gamma_pulse = float(beta[gamma_pulse_idx])
+        gamma_step = float(beta[gamma_pulse_idx + 1])
+        beta_offset = gamma_pulse_idx + 2
         gamma_exog = float(beta[beta_offset]) if exog is not None and len(beta) > beta_offset else None
 
-        # Reconstruct fitted series recursively
-        s_hat = [float(input_series.iloc[0])]
-        for t in range(1, input_series.size):
-            x_t = s_hat[-1] * (1.0 - s_hat[-1] / K)
-            # Determine which segment t-1 (for ΔS at month t) belongs to
-            seg_idx = 0
-            for j, (a, b) in enumerate(seg_bounds):
-                if (t - 1) >= a and (t - 1) <= b:
-                    seg_idx = j
-                    break
-            delta = gamma_intercept + r_segments[seg_idx] * x_t
-            # Add events
-            if t - 1 < len(pulse):
-                delta += gamma_pulse * float(pulse[t - 1])
-                delta += gamma_step * float(step[t - 1])
-            # Add optional exogenous
-            if exog is not None and (t - 1) < len(exog) and gamma_exog is not None:
-                delta += gamma_exog * float(exog[t - 1])
-            s_hat.append(max(s_hat[-1] + delta, 0.0))
+        segment_intercepts = [gamma_intercept + offsets[i] for i in range(num_segments)] if num_segments else []
 
+        # Reconstruct fitted series by integrating predicted deltas from the linear model
+        y_hat = X @ beta
+        s_hat = np.empty(n + 1, dtype=float)
+        s_hat[0] = float(input_series.iloc[0])
+        for t in range(n):
+            s_hat[t + 1] = max(s_hat[t] + y_hat[t], 0.0)
         fitted = pd.Series(s_hat, index=input_series.index)
-        # Residuals on deltas
-        y_hat = fitted.diff().reindex(y.index)
-        resid = y - y_hat
+        # Residuals on deltas (aligned to y index)
+        resid = y - pd.Series(y_hat, index=y.index)
         sse = float(np.square(resid.to_numpy()).sum())
         tss = float(np.square(y.to_numpy() - float(y.mean())).sum())
         r2 = 1.0 - (sse / tss if tss > 0 else np.nan)
@@ -210,6 +211,7 @@ def fit_piecewise_logistic(
         fit = PiecewiseLogisticFit(
             carrying_capacity=float(K),
             segment_growth_rates=r_segments,
+            segment_intercepts=segment_intercepts,
             breakpoints=bps,
             gamma_pulse=gamma_pulse,
             gamma_step=gamma_step,
@@ -263,6 +265,7 @@ def fitted_series_from_params(
     gamma_step: float = 0.0,
     gamma_exog: float | None = None,
     gamma_intercept: float | None = None,
+    segment_intercepts: Sequence[float] | None = None,
 ) -> pd.Series:
     """
     This takes the parameters and uses uses them to predict the future.
@@ -299,51 +302,96 @@ def fitted_series_from_params(
         # Pad with last known rate
         r_list = r_list + [r_list[-1] if r_list else 0.0] * (len(seg_bounds) - len(r_list))
 
-    # If intercept not supplied, infer it from observed deltas with provided params
-    if gamma_intercept is None:
-        y = s.diff().dropna()
-        s_lag = s.shift(1).reindex(y.index).astype(float)
-        # Map each delta row to its segment index
-        seg_idx_per_row: list[int] = []
-        for t in range(y.size):
-            seg_idx = 0
-            for j, (a, b) in enumerate(seg_bounds):
-                if a <= t <= b:
-                    seg_idx = j
-                    break
-            seg_idx_per_row.append(seg_idx)
+    num_segments = len(seg_bounds)
 
-        x_base = s_lag.to_numpy() * (1.0 - s_lag.to_numpy() / float(carrying_capacity))
-        contrib = np.zeros_like(x_base, dtype=float)
-        for t, seg_idx in enumerate(seg_idx_per_row):
-            contrib[t] = float(r_list[seg_idx]) * x_base[t]
-
-        contrib += float(gamma_pulse) * np.asarray(pulse, dtype=float)
-        contrib += float(gamma_step) * np.asarray(step, dtype=float)
-        if exog is not None and gamma_exog is not None:
-            contrib += float(gamma_exog) * exog
-
-        residual = y.to_numpy(dtype=float) - contrib
-        gamma_intercept = float(np.nanmean(residual)) if residual.size else 0.0
+    # Determine per-segment intercepts
+    if segment_intercepts is not None and len(segment_intercepts) > 0:
+        intercepts = [float(v) for v in segment_intercepts]
+        if len(intercepts) < num_segments:
+            intercepts.extend([intercepts[-1]] * (num_segments - len(intercepts)))
+        gamma_intercept = float(intercepts[0])
     else:
-        gamma_intercept = float(gamma_intercept)
+        if gamma_intercept is None:
+            y = s.diff().dropna()
+            s_lag = s.shift(1).reindex(y.index).astype(float)
+            # Map each delta row to its segment index
+            seg_idx_per_row: list[int] = []
+            for t in range(y.size):
+                seg_idx = 0
+                for j, (a, b) in enumerate(seg_bounds):
+                    if a <= t <= b:
+                        seg_idx = j
+                        break
+                seg_idx_per_row.append(seg_idx)
 
-    s_hat = [float(s.iloc[0])]
-    for t in range(1, s.size):
-        x_t = s_hat[-1] * (1.0 - s_hat[-1] / float(carrying_capacity))
-        # Determine segment for delta at t
-        seg_idx = 0
-        for j, (a, b) in enumerate(seg_bounds):
-            if (t - 1) >= a and (t - 1) <= b:
-                seg_idx = j
-                break
-        delta = float(gamma_intercept) + float(r_list[seg_idx]) * x_t
-        if t - 1 < len(pulse):
-            delta += float(gamma_pulse) * float(pulse[t - 1])
-            delta += float(gamma_step) * float(step[t - 1])
-        if exog is not None and (t - 1) < len(exog) and gamma_exog is not None:
-            delta += float(gamma_exog) * float(exog[t - 1])
-        s_hat.append(max(s_hat[-1] + delta, 0.0))
+            x_base = s_lag.to_numpy() * (1.0 - s_lag.to_numpy() / float(carrying_capacity))
+            contrib = np.zeros_like(x_base, dtype=float)
+            for t, seg_idx in enumerate(seg_idx_per_row):
+                contrib[t] = float(r_list[seg_idx]) * x_base[t]
 
-    # Return float-valued series to exactly match the fitted recursion
-    return pd.Series(np.asarray(s_hat, dtype=float), index=s.index)
+            contrib += float(gamma_pulse) * np.asarray(pulse, dtype=float)
+            contrib += float(gamma_step) * np.asarray(step, dtype=float)
+            if exog is not None and gamma_exog is not None:
+                contrib += float(gamma_exog) * exog
+
+            residual = y.to_numpy(dtype=float) - contrib
+            gamma_intercept = float(np.nanmean(residual)) if residual.size else 0.0
+        else:
+            gamma_intercept = float(gamma_intercept)
+        intercepts = [gamma_intercept] * max(num_segments, 1)
+
+    intercepts = intercepts if num_segments else []
+
+    # Build the same design matrix used in fitting to compute predicted deltas
+    y = s.diff().dropna()
+    s_lag = s.shift(1).reindex(y.index).astype(float)
+    n = len(y)
+    X_base = (s_lag * (1.0 - s_lag / float(carrying_capacity))).to_numpy(dtype=float)
+
+    masks: list[np.ndarray] = []
+    for start, end in seg_bounds:
+        mask = np.zeros(n, dtype=float)
+        lo = max(0, start)
+        hi = min(n, end + 1)
+        if lo < hi:
+            mask[lo:hi] = 1.0
+        masks.append(mask)
+    intercept_masks = [m.copy() for m in masks[1:]] if len(masks) > 1 else []
+
+    X_cols: list[np.ndarray] = [(X_base * m) for m in masks]
+    X_cols.append(np.ones(n, dtype=float))
+    for im in intercept_masks:
+        X_cols.append(im)
+    pulse_arr = np.asarray(pulse, dtype=float)
+    step_arr = np.asarray(step, dtype=float)
+    X_cols.append(pulse_arr)
+    X_cols.append(step_arr)
+    if exog is not None:
+        X_cols.append(exog)
+
+    if not X_cols:
+        return s.astype(float)
+
+    X = np.column_stack(X_cols)
+    beta = np.zeros(X.shape[1], dtype=float)
+    beta[:num_segments] = [float(r) for r in r_list[:num_segments]]
+    if num_segments:
+        baseline_intercept = intercepts[0]
+    else:
+        baseline_intercept = float(gamma_intercept or 0.0)
+    beta[num_segments] = baseline_intercept
+    for idx, intercept in enumerate(intercepts[1:], start=1):
+        beta[num_segments + idx] = float(intercept - baseline_intercept)
+    offset_count = max(num_segments - 1, 0)
+    gamma_pulse_idx = num_segments + 1 + offset_count
+    beta[gamma_pulse_idx] = float(gamma_pulse)
+    beta[gamma_pulse_idx + 1] = float(gamma_step)
+    if exog is not None:
+        beta[gamma_pulse_idx + 2] = float(gamma_exog or 0.0)
+
+    y_hat = X @ beta
+    s_hat = np.empty(n + 1, dtype=float)
+    s_hat[0] = float(s.iloc[0])
+    for t in range(n):
+        s_hat[t + 1] = max(s_hat[t] + y_hat[t], 0.0)
+    return pd.Series(s_hat, index=s.index)

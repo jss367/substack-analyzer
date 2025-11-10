@@ -806,6 +806,10 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 st.session_state["modelfit_gamma_exog"] = float(getattr(fit, "gamma_exog", 0.0))
             if "modelfit_r" not in st.session_state:
                 st.session_state["modelfit_r"] = list(getattr(fit, "segment_growth_rates", []) or [])
+            if "modelfit_intercepts" not in st.session_state:
+                st.session_state["modelfit_intercepts"] = list(
+                    getattr(fit, "segment_intercepts", []) or []
+                )
 
             # ----- read current overrides & recompute fitted line with them -----
             def _current_fit_params():
@@ -814,14 +818,19 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 r_list = list(
                     st.session_state.get("modelfit_r", list(getattr(fit_obj, "segment_growth_rates", []) or []))
                 )
+                intercepts = list(
+                    st.session_state.get(
+                        "modelfit_intercepts", list(getattr(fit_obj, "segment_intercepts", []) or [])
+                    )
+                )
                 gp_val = float(
                     st.session_state.get("modelfit_gamma_pulse", getattr(fit_obj, "gamma_pulse", 0.0) or 0.0)
                 )
                 gs_val = float(st.session_state.get("modelfit_gamma_step", getattr(fit_obj, "gamma_step", 0.0) or 0.0))
                 gx_val = st.session_state.get("modelfit_gamma_exog", getattr(fit_obj, "gamma_exog", None))
-                return k_val, r_list, gp_val, gs_val, gx_val
+                return k_val, r_list, intercepts, gp_val, gs_val, gx_val
 
-            K_now, r_list_now, gp_now, gs_now, gx_now = _current_fit_params()
+            K_now, r_list_now, intercepts_now, gp_now, gs_now, gx_now = _current_fit_params()
 
             fitted_from_overrides = fitted_series_from_params(
                 total_series=fit_series_source,
@@ -833,6 +842,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 gamma_pulse=float(gp_now),
                 gamma_step=float(gs_now),
                 gamma_exog=(float(gx_now) if gx_now is not None else None),
+                segment_intercepts=intercepts_now,
             )
 
             # ----- overlay chart: Actual vs Fitted (overrides) -----

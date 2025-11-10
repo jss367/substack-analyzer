@@ -19,8 +19,10 @@ class BreakpointEffect:
     slope_pre: float
     slope_post: float
     slope_delta: float
-    jump_size: float  # ΔS spike at k
+    jump_size: float  # Estimated level shift magnitude (post median - pre median)
     z_spike: float
+    rate_score: float  # |Δslope| relative to rate threshold
+    level_score: float  # |Δlevel| relative to level threshold
     note: str | None = None
 
 
@@ -52,10 +54,8 @@ def classify_breakpoints_effect(
         return []
     ds = input_series.diff().dropna()
 
-    sig_delta = _mad(ds.to_numpy()) or (np.std(ds.to_numpy(), ddof=1) or 1.0)
-    sig_level = _mad(input_series.to_numpy()) or (np.std(input_series.to_numpy(), ddof=1) or 1.0)
-    tau_rate = rate_factor * sig_delta
-    tau_level = level_factor * sig_level
+    global_sig_delta = _mad(ds.to_numpy()) or (np.std(ds.to_numpy(), ddof=1) or 1.0)
+    global_sig_level = _mad(input_series.to_numpy()) or (np.std(input_series.to_numpy(), ddof=1) or 1.0)
 
     out: List[BreakpointEffect] = []
     for k in sorted(set(int(i) for i in candidates)):
@@ -68,17 +68,34 @@ def classify_breakpoints_effect(
         if len(pre_s) < 2 or len(post_s) < 2 or len(pre_d) < 1 or len(post_d) < 1:
             continue
 
+        local_delta = np.concatenate((pre_d.to_numpy(dtype=float), post_d.to_numpy(dtype=float)))
+        local_level = np.concatenate((pre_s.to_numpy(dtype=float), post_s.to_numpy(dtype=float)))
+
+        sig_delta = _mad(local_delta) or (np.std(local_delta, ddof=1) or global_sig_delta)
+        sig_level = _mad(local_level) or (np.std(local_level, ddof=1) or global_sig_level)
+        if not np.isfinite(sig_delta) or sig_delta <= 0:
+            sig_delta = global_sig_delta or 1.0
+        if not np.isfinite(sig_level) or sig_level <= 0:
+            sig_level = global_sig_level or 1.0
+        if np.isfinite(global_sig_delta) and global_sig_delta > 0:
+            sig_delta = min(sig_delta, global_sig_delta)
+        if np.isfinite(global_sig_level) and global_sig_level > 0:
+            sig_level = min(sig_level, global_sig_level)
+
+        tau_rate = rate_factor * sig_delta
+        tau_level = level_factor * sig_level
+
         mu_pre, mu_post = float(np.median(pre_d)), float(np.median(post_d))
         delta_mu = mu_post - mu_pre
-        spike = float(ds.iloc[k]) if k < len(ds) else 0.0
+        spike = float(input_series.iloc[k] - input_series.iloc[k - 1]) if k > 0 else 0.0
         z_spike = spike / (sig_delta or 1.0)
 
         slope_pre, a_pre = _fit_line(pre_s)
         slope_post, a_post = _fit_line(post_s)
 
-        pred_pre_at_k = a_pre + slope_pre * len(pre_s)
-        pred_post_at_k = a_post + slope_post * 0.0
-        level_jump = float(input_series.iloc[k] - (pred_pre_at_k + pred_post_at_k) / 2.0)
+        median_pre = float(np.median(pre_s))
+        median_post = float(np.median(post_s))
+        level_jump = median_post - median_pre
         slope_delta = slope_post - slope_pre
 
         # Decide effect & component
@@ -86,12 +103,16 @@ def classify_breakpoints_effect(
         component: Component = "none"
         note = None
 
-        if abs(z_spike) >= z_pulse and abs(delta_mu) < 0.5 * tau_rate:
+        if abs(z_spike) >= z_pulse and abs(delta_mu) < 0.5 * tau_rate and abs(level_jump) < tau_level:
             effect, component = "Transient", "pulse"
             note = f"pulse z≈{z_spike:.1f}"
+            rate_score = 0.0
+            level_score = 0.0
         else:
             rate_flag = abs(slope_delta) >= tau_rate
             level_flag = abs(level_jump) >= tau_level
+            rate_score = abs(slope_delta) / tau_rate if tau_rate > 0 else float("inf")
+            level_score = abs(level_jump) / tau_level if tau_level > 0 else float("inf")
             if rate_flag and level_flag:
                 effect, component = "Persistent", "mixed"
                 note = f"Δslope={slope_delta:.3f}/mo; step≈{level_jump:.1f}"
@@ -104,6 +125,10 @@ def classify_breakpoints_effect(
             else:
                 effect, component = "No effect", "none"
                 note = "weak/no change"
+            if not np.isfinite(rate_score):
+                rate_score = 0.0
+            if not np.isfinite(level_score):
+                level_score = 0.0
 
         out.append(
             BreakpointEffect(
@@ -114,8 +139,10 @@ def classify_breakpoints_effect(
                 slope_pre=float(slope_pre),
                 slope_post=float(slope_post),
                 slope_delta=float(slope_delta),
-                jump_size=float(spike),
+                jump_size=float(level_jump),
                 z_spike=float(z_spike),
+                rate_score=float(rate_score),
+                level_score=float(level_score),
                 note=note,
             )
         )
@@ -140,8 +167,16 @@ def breakpoints_to_events(bps: List[BreakpointEffect], target_label: str) -> pd.
 
 
 def breakpoints_for_segments(bps: List[BreakpointEffect]) -> List[int]:
-    # Only rate/mixed imply an r change; those set the piecewise segments
-    return sorted(set(b.index for b in bps if b.effect == "Persistent" and b.component in {"rate", "mixed"}))
+    def is_segment_worthy(b: BreakpointEffect) -> bool:
+        if b.effect != "Persistent":
+            return False
+        if b.component in {"rate", "mixed"}:
+            return True
+        if b.component == "level" and b.level_score >= 1.5:
+            return True
+        return False
+
+    return sorted(set(b.index for b in bps if is_segment_worthy(b)))
 
 
 def detect_and_classify(

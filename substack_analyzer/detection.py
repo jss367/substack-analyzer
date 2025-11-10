@@ -195,15 +195,12 @@ def detect_change_points(
         if m < (2 * min_seg_len + 1):
             return []
 
-        sigma2 = _robust_sigma2(x)
-        penalty = penalty_scale * sigma2 * np.log(max(m, 2))
-
         S1, S2 = _prefix_sums(x)
 
-        def best_split(a: int, b: int) -> tuple[int | None, float]:
+        def best_split(a: int, b: int) -> tuple[int | None, float, float]:
             L = b - a
             if L < 2 * min_seg_len + 1:
-                return None, 0.0
+                return None, 0.0, 0.0
             total = _seg_sse(S1, S2, a, b)
             best_k, best_gain = None, 0.0
             # search interior split points honoring min_seg_len
@@ -211,33 +208,40 @@ def detect_change_points(
                 gain = total - (_seg_sse(S1, S2, a, k) + _seg_sse(S1, S2, k, b))
                 if gain > best_gain:
                     best_gain, best_k = gain, k
-            return best_k, best_gain
+            if best_k is None:
+                return None, 0.0, 0.0
+            local_sigma2 = _robust_sigma2(x[a:b])
+            local_penalty = penalty_scale * local_sigma2 * np.log(max(L, 2))
+            return best_k, best_gain, float(local_penalty)
 
         # Greedy binary segmentation with penalty threshold
         segs: list[tuple[int, int]] = [(0, m)]
         ks: list[int] = []
         raw_gains: list[float] = []
+        penalties: list[float] = []
 
         while segs and len(ks) < max_changes:
-            candidates: list[tuple[float, int, int, int]] = []
+            candidates: list[tuple[float, float, float, int, int, int]] = []
             for a, b in segs:
-                k, gain = best_split(a, b)
+                k, gain, local_penalty = best_split(a, b)
                 if k is not None:
-                    candidates.append((gain, a, k, b))
+                    score = gain - local_penalty
+                    candidates.append((score, gain, local_penalty, a, k, b))
             if not candidates:
                 break
-            gain, a, k, b = max(candidates, key=lambda t: t[0])
-            if gain <= penalty:
+            score, gain, local_penalty, a, k, b = max(candidates, key=lambda t: t[0])
+            if score <= 0:
                 break
             ks.append(k)
             raw_gains.append(gain)
+            penalties.append(local_penalty)
             segs.remove((a, b))
             segs.extend([(a, k), (k, b)])
 
         # Map to original index space and build ChangePoint list
         kind_name = {0: "level", 1: "slope", 2: "accel"}[d]
         cps: list[ChangePoint] = []
-        for k, g in zip(ks, raw_gains):
+        for k, g, p in zip(ks, raw_gains, penalties):
             i = k + d
             if 0 <= i < n:
                 cps.append(
@@ -247,8 +251,8 @@ def detect_change_points(
                         kind=kind_name,
                         order=d,
                         gain=g,
-                        penalty=float(penalty),
-                        score=float(g - penalty),
+                        penalty=float(p),
+                        score=float(g - p),
                     )
                 )
         return cps

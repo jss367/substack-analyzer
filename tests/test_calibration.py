@@ -200,7 +200,9 @@ def test_fit_piecewise_logistic_on_gm_series():
 
     # Detect and classify, then use only segment-worthy breakpoints
     classified = detect_and_classify(input_series, max_changes=4, window=6)
+    assert 3 <= len(classified) <= 4
     bkps = breakpoints_for_segments(classified)
+    assert 3 <= len(bkps) <= 4
     # Optionally could pass events from classification; not required for this test
     fit = fit_piecewise_logistic(input_series, breakpoints=bkps)
 
@@ -208,7 +210,7 @@ def test_fit_piecewise_logistic_on_gm_series():
     assert len(fit.fitted_series) == len(input_series)
     assert fit.carrying_capacity > input_series.max()
     assert len(fit.segment_growth_rates) == (len(bkps) + 1 if bkps else 1)
-    assert fit.sse >= 0.0
+    assert fit.sse <= 1200.0
 
 
 def test_fit_piecewise_logistic_with_cy_series():
