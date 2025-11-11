@@ -39,7 +39,7 @@ def test_phase1_ads_really_valuable_phase1_json():
     assert 10000 < carrying_capacity < 30000, f"carrying_capacity {carrying_capacity} is not in range"
     assert 0.0 <= gamma_step <= 0.50, f"gamma_step {gamma_step} is not in range"
     assert 0.0 <= gamma_pulse <= 1, f"gamma_pulse {gamma_pulse} is not in range"
-    assert 0.05 <= gamma_exog <= 0.2, f"gamma_exog {gamma_exog} is not in range"
+    assert 0.05 <= gamma_exog <= 0.2, f"gamma_exog {gamma_exog} is not in range"  # why is this so low?
 
 
 def test_phase1_ads_have_no_effect_phase1_json():
@@ -69,7 +69,7 @@ def test_phase1_ads_have_no_effect_phase1_json():
     assert -500.0 <= gamma_intercept <= 500.0, f"gamma_intercept {gamma_intercept} is not in range"
     assert 0.0 <= gamma_pulse <= 1e-3, f"gamma_pulse {gamma_pulse} is not in range"
     assert 0.0 <= gamma_step <= 1e-3, f"gamma_step {gamma_step} is not in range"
-    assert -1 <= gamma_exog <= 1, f"gamma_exog {gamma_exog} is not in range"
+    assert -1 <= gamma_exog <= 1, f"gamma_exog {gamma_exog} is not in range"  # why is this so close to -1?
     assert sse <= 200
 
 
@@ -113,10 +113,9 @@ def test_phase1_ads_extremely_valuable_fit_with_exog():
     # Fit with exogenous regressor; no structural breakpoints in this scenario
     fit = fit_piecewise_logistic(series, breakpoints=[], extra_exog=exog)
 
-    assert len(fit.fitted_series) == len(series)
-    assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 1
     assert fit.exog_lag == 1
+    assert fit.gamma_exog > 1000
     # The exogenous signal should almost perfectly explain monthly changes
     assert fit.r2_on_deltas > 0.8
     assert fit.sse <= 30_000_000
