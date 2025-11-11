@@ -8,7 +8,7 @@ from substack_analyzer.analysis import build_events_features
 from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes, synthesize_series_with_exog
 
 
-def scenario_top_tier_sustained_marketing() -> dict:
+def scenario_params_top_tier_sustained_marketing() -> dict:
     """
     Top-tier newsletter saturating after sustained marketing.
     """
@@ -36,7 +36,7 @@ def scenario_top_tier_sustained_marketing() -> dict:
     }
 
 
-def scenario_small_breakout() -> dict:
+def scenario_params_small_breakout() -> dict:
     """
     Small newsletter that eventually breaks out.
     """
@@ -64,7 +64,7 @@ def scenario_small_breakout() -> dict:
     }
 
 
-def scenario_niche_steady() -> dict:
+def scenario_params_niche_steady() -> dict:
     """
     Niche newsletter that stays relatively small but steady.
     """
@@ -85,7 +85,7 @@ def scenario_niche_steady() -> dict:
     }
 
 
-def scenario_mid_sized_seasonal_conference() -> dict:
+def scenario_params_mid_sized_seasonal_conference() -> dict:
     """
     Mid-sized publication with seasonal campaigns and a big conference push.
     """
@@ -118,15 +118,15 @@ def realistic_growth_profiles_cases() -> list[dict]:
     Backwards-compatible list of the four individual cases.
     """
     return [
-        scenario_top_tier_sustained_marketing(),
-        scenario_small_breakout(),
-        scenario_niche_steady(),
-        scenario_mid_sized_seasonal_conference(),
+        scenario_params_top_tier_sustained_marketing(),
+        scenario_params_small_breakout(),
+        scenario_params_niche_steady(),
+        scenario_params_mid_sized_seasonal_conference(),
     ]
 
 
 def top_tier_sustained_marketing_series() -> pd.Series:
-    params = scenario_top_tier_sustained_marketing()
+    params = scenario_params_top_tier_sustained_marketing()
     idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
     vals = [
         15000,
@@ -182,7 +182,7 @@ def top_tier_sustained_marketing_series() -> pd.Series:
 
 
 def small_breakout_series() -> pd.Series:
-    params = scenario_small_breakout()
+    params = scenario_params_small_breakout()
     idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
     vals = [
         300,
@@ -232,7 +232,7 @@ def small_breakout_series() -> pd.Series:
 
 
 def niche_steady_series() -> pd.Series:
-    params = scenario_niche_steady()
+    params = scenario_params_niche_steady()
     idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
     vals = [
         800,
@@ -276,7 +276,7 @@ def niche_steady_series() -> pd.Series:
 
 
 def mid_sized_seasonal_conference_series() -> pd.Series:
-    params = scenario_mid_sized_seasonal_conference()
+    params = scenario_params_mid_sized_seasonal_conference()
     idx = pd.period_range("2020-01", periods=params["months"], freq="M").to_timestamp("M")
     vals = [
         2500,
@@ -458,7 +458,7 @@ def two_segment_ordered_series() -> tuple[pd.Series, list[int]]:
     return s, [5]
 
 
-def scenario_ads_really_valuable():
+def scenario_ads_really_valuable() -> pd.Series:
     # Monthly timeline
     idx = pd.period_range("2022-01", periods=36, freq="M").to_timestamp("M")
     plot_df = pd.DataFrame(index=idx)
@@ -525,6 +525,6 @@ def scenario_ads_no_effect():
     exog = features_df["ad_effect_log"].astype(float) * 0.0
 
     # Build Total series without exogenous effect
-    total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=0.0)
+    total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=1000)
 
     return total
