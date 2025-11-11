@@ -30,7 +30,7 @@ def test_small_breakout_series_fit():
     fit = fit_piecewise_logistic(series, breakpoints=bkps)
     assert len(fit.fitted_series) == len(series)
     assert fit.carrying_capacity > float(series.max())
-    assert len(fit.segment_growth_rates) == 3
+    assert len(fit.segment_growth_rates) == 5
     # Later growth should generally be higher than early growth
     assert fit.segment_growth_rates[-1] > fit.segment_growth_rates[0]
     assert fit.r2_on_deltas > 0.8
