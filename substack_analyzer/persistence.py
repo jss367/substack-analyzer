@@ -3,6 +3,7 @@ import json
 import math
 import zipfile
 from contextlib import suppress
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -298,21 +299,23 @@ def export_phase_one_json() -> bytes:
             df["date"] = pd.to_datetime(df["date"]).dt.date.astype(str)
         ad_spend_records = df.rename(columns={"ad_spend": "spend"}).to_dict(orient="records")
 
-    payload: dict[str, Any] = PhaseOneOutput(
-        total_series=_series_to_records(total),
-        paid_series=_series_to_records(paid),
-        breakpoints_indices=list(st.session_state.get("detected_breakpoints", []) or []),
-        breakpoints_dates=[
-            str(pd.to_datetime(d).date()) for d in (st.session_state.get("detected_change_dates", []) or [])
-        ],
-        events=[EventRow(**r) for r in ev_rows],
-        ad_spend=ad_spend_records,
-        adstock_lambda=float(st.session_state.get("adstock_lambda", 0.5)),
-        ad_log_theta=float(st.session_state.get("ad_log_theta", 500.0)),
-        detect_mode=str(st.session_state.get("detect_on", "Auto")),
-        detected_target_label=st.session_state.get("detected_target_label"),
-        target_col_for_fit=st.session_state.get("detected_target_col"),
-    ).__dict__
+    payload: dict[str, Any] = asdict(
+        PhaseOneOutput(
+            total_series=_series_to_records(total),
+            paid_series=_series_to_records(paid),
+            breakpoints_indices=list(st.session_state.get("detected_breakpoints", []) or []),
+            breakpoints_dates=[
+                str(pd.to_datetime(d).date()) for d in (st.session_state.get("detected_change_dates", []) or [])
+            ],
+            events=[EventRow(**r) for r in ev_rows],
+            ad_spend=ad_spend_records,
+            adstock_lambda=float(st.session_state.get("adstock_lambda", 0.5)),
+            ad_log_theta=float(st.session_state.get("ad_log_theta", 500.0)),
+            detect_mode=str(st.session_state.get("detect_on", "Auto")),
+            detected_target_label=st.session_state.get("detected_target_label"),
+            target_col_for_fit=st.session_state.get("detected_target_col"),
+        )
+    )
 
     # If a model fit is present, include its parameters for Phase 2 equation-based simulation
     fit = st.session_state.get("pwlog_fit")
