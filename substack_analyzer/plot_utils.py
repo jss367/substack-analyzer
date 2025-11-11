@@ -64,6 +64,10 @@ def plot_fit_vs_actual(
     # Optional vertical lines for breakpoints
     if show_breakpoints and getattr(fit, "breakpoints", None):
         idx = actual.index
+        if len(idx) == 0:
+            logger.debug("Skipping breakpoint plotting: empty index")
+            return ax
+
         for b in fit.breakpoints:
             if not isinstance(b, int):
                 logger.debug("Skipping breakpoint %r: non-integer index", b)
@@ -71,8 +75,20 @@ def plot_fit_vs_actual(
 
             if b <= 0:
                 boundary_index = 0
+                logger.debug(
+                    "Clamping breakpoint %r at or below zero to index %r (timestamp=%s)",
+                    b,
+                    boundary_index,
+                    idx[boundary_index],
+                )
             elif b < len(idx):
                 boundary_index = b - 1
+                logger.debug(
+                    "Shifting breakpoint %r to previous index %r (timestamp=%s)",
+                    b,
+                    boundary_index,
+                    idx[boundary_index],
+                )
             else:
                 logger.debug(
                     "Skipping breakpoint %r: exceeds index range (len=%d)",
@@ -80,13 +96,6 @@ def plot_fit_vs_actual(
                     len(idx),
                 )
                 continue
-
-            logger.debug(
-                "Plotting breakpoint %r at index %r (timestamp=%s)",
-                b,
-                boundary_index,
-                idx[boundary_index],
-            )
             ax.axvline(idx[boundary_index], color="#DB4437", linestyle="--", linewidth=1.2)
 
     ax.set_title(title)
