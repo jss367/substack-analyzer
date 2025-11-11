@@ -780,25 +780,15 @@ def events_features_ui(plot_df: pd.DataFrame) -> None:
             logger.info("Use 'Download phase1.json' to save handoff to Phase 2.")
         except Exception:
             pass
-        # Phase 1 handoff: export/import portable artifact
-        col_dl, col_up = st.columns(2)
-        with col_dl:
-            st.download_button(
-                "Download phase1.json",
-                data=export_phase_one_json(),
-                file_name="phase1.json",
-                mime="application/json",
-                help="Portable handoff from Phase 1 → Phase 2 (series, events, ad spend, breakpoints, knobs)",
-            )
-        with col_up:
-            uploaded_phase1 = st.file_uploader("Load phase1.json", type=["json"], key="phase1_json")
-            if uploaded_phase1 is not None:
-                try:
-                    apply_phase_one_json(uploaded_phase1)
-                    st.success("Phase 1 artifact loaded. Rebuilding features and updating state…")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to load phase1.json: {e}")
+        # Phase 1 handoff: import portable artifact
+        uploaded_phase1 = st.file_uploader("Load phase1.json", type=["json"], key="phase1_json")
+        if uploaded_phase1 is not None:
+            try:
+                apply_phase_one_json(uploaded_phase1)
+                st.success("Phase 1 artifact loaded. Rebuilding features and updating state…")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to load phase1.json: {e}")
 
 
 def adds_and_churn_ui(plot_df: pd.DataFrame) -> None:
@@ -1119,6 +1109,17 @@ def metrics_and_apply_ui(all_series: pd.Series | None, paid_series: pd.Series | 
 
     st.caption(
         "Notes: From totals alone we can compute net growth and a conversion proxy (when both series present). Churn and CAC need more detail."
+    )
+
+    # Offer the Phase 1 download near the final action
+    st.download_button(
+        "Download phase1.json",
+        data=export_phase_one_json(),
+        file_name="phase1.json",
+        mime="application/json",
+        help=(
+            "Portable handoff from Phase 1 → Phase 2 " "(series, events, ad spend, breakpoints, knobs, fit parameters)"
+        ),
     )
 
     if st.button("Apply estimates to Simulator"):
