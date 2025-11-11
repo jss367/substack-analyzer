@@ -371,9 +371,9 @@ def gm_series_values() -> pd.Series:
     return pd.Series(vals, index=idx)
 
 
-def cy_series_values() -> tuple[pd.Series, list[int]]:
+def cy_series_values() -> pd.Series:
     """
-    Series with a jump in growth rate around 2025-01; test uses a known breakpoint.
+    Series with a jump in growth rate around 2025-01.
     """
     idx = pd.period_range("2023-09", periods=26, freq="M").to_timestamp("M")
     vals: list[float] = []
@@ -387,7 +387,7 @@ def cy_series_values() -> tuple[pd.Series, list[int]]:
             v += 80.0 + 1.2 * i + 12 * (i - jump_index)
         vals.append(float(round(v)))
     series = pd.Series(vals, index=idx)
-    return series, [16]
+    return series
 
 
 def one_time_spike_series_and_events() -> tuple[pd.Series, pd.DataFrame]:

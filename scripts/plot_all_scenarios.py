@@ -72,7 +72,8 @@ def _build_gm_series_subplot(ax: plt.Axes) -> None:
 
 
 def _build_cy_series_subplot(ax: plt.Axes) -> None:
-    series, bkps = cy_series_values()
+    series = cy_series_values()
+    bkps = [16]
     fit = fit_piecewise_logistic(series, breakpoints=bkps)
     title = f"cy_series (bkps {bkps})\n" f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
     plot_fit_vs_actual(series, fit, title=title, show_breakpoints=True, ax=ax, show=False)

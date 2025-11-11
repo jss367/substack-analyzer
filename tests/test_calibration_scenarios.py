@@ -2,6 +2,7 @@ import pandas as pd
 
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic
+from substack_analyzer.detection import detect_change_points
 from substack_analyzer.scenarios import (
     mid_sized_seasonal_conference_series,
     niche_steady_series,
@@ -25,7 +26,7 @@ def test_top_tier_sustained_marketing_series_fit():
 
 def test_small_breakout_series_fit():
     series = small_breakout_series()
-    bkps = [18, 30]
+    bkps = detect_change_points(series, max_changes=4, min_seg_len=3, return_mode="indices")
     fit = fit_piecewise_logistic(series, breakpoints=bkps)
     assert len(fit.fitted_series) == len(series)
     assert fit.carrying_capacity > float(series.max())

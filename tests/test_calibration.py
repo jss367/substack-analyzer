@@ -5,7 +5,8 @@ import streamlit as st
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_from_params, forecast_piecewise_logistic
 from substack_analyzer.changepoints import breakpoints_for_segments, detect_and_classify
-from substack_analyzer.scenarios import gm_series_values
+from substack_analyzer.detection import detect_change_points
+from substack_analyzer.scenarios import cy_series_values, gm_series_values
 from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes, synthesize_series_with_exog
 
 
@@ -193,6 +194,38 @@ def test_fit_piecewise_logistic_with_cy_series():
         # Later growth should be faster than the early growth in this scenario
         assert fit.segment_growth_rates[-1] > fit.segment_growth_rates[0]
     assert fit.sse <= 20
+
+
+def test_cy_series_ad_effect():
+    """
+    cy_series_values is driven by a structural growth-rate change, not ads.
+    Adding ad exogenous features should have minimal effect on fit quality.
+    """
+    series = cy_series_values()
+    bkps = detect_change_points(series, max_changes=4, min_seg_len=3, return_mode="indices")
+    idx = series.index
+    plot_df = pd.DataFrame(index=idx)
+
+    # Add some synthetic ad spend spikes unrelated to the structural jump
+    spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
+    ad_file = ad_spend_csv_with_spikes(idx, spikes)
+    _covariates_df, features_df = build_events_features(plot_df, lam=0.5, theta=500.0, ad_file=ad_file)
+    exog = features_df["ad_effect_log"].astype(float).fillna(0.0)
+
+    # Fit with and without exogenous regressor
+    fit_no_exog = fit_piecewise_logistic(series, breakpoints=bkps)
+    fit_with_exog = fit_piecewise_logistic(series, breakpoints=bkps, extra_exog=exog)
+
+    # Basic plausibility checks
+    assert len(fit_with_exog.fitted_series) == len(series)
+    assert fit_with_exog.carrying_capacity > float(series.max())
+    assert len(fit_with_exog.segment_growth_rates) == (len(bkps) + 1 if bkps else 1)
+
+    # Ads should not meaningfully explain changes in this scenario
+    assert fit_with_exog.gamma_exog is not None
+    assert abs(float(fit_with_exog.gamma_exog)) <= 10.0
+    sse_improvement = float(fit_no_exog.sse - fit_with_exog.sse)
+    assert sse_improvement / float(fit_no_exog.sse) <= 0.10
 
 
 def test_phase1_ads_spiky_spend_phase1_json():
