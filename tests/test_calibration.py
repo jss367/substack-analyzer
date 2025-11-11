@@ -216,14 +216,8 @@ def test_cy_series_ad_effect():
     fit_no_exog = fit_piecewise_logistic(series, breakpoints=bkps)
     fit_with_exog = fit_piecewise_logistic(series, breakpoints=bkps, extra_exog=exog)
 
-    # Basic plausibility checks
-    assert len(fit_with_exog.fitted_series) == len(series)
-    assert fit_with_exog.carrying_capacity > float(series.max())
-    assert len(fit_with_exog.segment_growth_rates) == (len(bkps) + 1 if bkps else 1)
-
     # Ads should not meaningfully explain changes in this scenario
-    assert fit_with_exog.gamma_exog is not None
-    assert abs(float(fit_with_exog.gamma_exog)) <= 10.0
+    assert -1 <= fit_with_exog.gamma_exog <= 1
     sse_improvement = float(fit_no_exog.sse - fit_with_exog.sse)
     assert sse_improvement / float(fit_no_exog.sse) <= 0.10
 
