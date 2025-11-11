@@ -787,7 +787,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if "modelfit_gamma_pulse" not in st.session_state:
                 st.session_state["modelfit_gamma_pulse"] = float(getattr(fit, "gamma_pulse", 0.0))
             if "modelfit_gamma_step" not in st.session_state:
-                st.session_state["modelfit_gamma_step"] = float(getattr(fit, "gamma_step", 0.0))
+                st.session_state["modelfit_gamma_step"] = float(getattr(fit, "gamma_step", 0.0) or 0.0)
             if getattr(fit, "gamma_exog", None) is not None and "modelfit_gamma_exog" not in st.session_state:
                 st.session_state["modelfit_gamma_exog"] = float(getattr(fit, "gamma_exog", 0.0))
             if "modelfit_r" not in st.session_state:
@@ -1274,7 +1274,7 @@ def sidebar_inputs() -> SimulationInputs:
                     "gamma_step",
                     min_value=-10.0,
                     max_value=10.0,
-                    default_value=float(getattr(fit, "gamma_step", 0.0)),
+                    default_value=float(getattr(fit, "gamma_step", 0.0) or 0.0),
                     step=0.001,
                     key="modelfit_gamma_step",
                 )
