@@ -106,6 +106,12 @@ def _event_rules_from_events() -> alt.Chart | None:
     ev2 = ev.copy()
     ev2["date"] = pd.to_datetime(ev2["date"], errors="coerce")
     ev2 = ev2.dropna(subset=["date"])
+    # For visualization only: if an event lands exactly on month-end (typical for detected breakpoints),
+    # show the vertical rule at the last month of the old segment (previous month-end).
+    with suppress(Exception):
+        ev2["marker_date"] = ev2["date"]
+        mask_me = ev2["date"].dt.is_month_end.fillna(False)
+        ev2.loc[mask_me, "marker_date"] = ev2.loc[mask_me, "date"] - pd.offsets.MonthEnd(1)
     # Normalize Effect labels for reliable styling
     eff_map = {"persistent": "Persistent", "transient": "Transient", "no effect": "No effect"}
     with suppress(Exception):
@@ -120,7 +126,7 @@ def _event_rules_from_events() -> alt.Chart | None:
             alt.Chart(ev_p)
             .mark_rule(strokeWidth=2, color="#27ae60")
             .encode(
-                x=alt.X("date:T", title="Date"),
+                x=alt.X("marker_date:T", title="Date"),
                 tooltip=[
                     alt.Tooltip("date:T", title="Date"),
                     alt.Tooltip("type:N", title="Type"),
@@ -138,7 +144,7 @@ def _event_rules_from_events() -> alt.Chart | None:
             alt.Chart(ev_t)
             .mark_rule(strokeWidth=2, color="#8e44ad", strokeDash=[6, 4])
             .encode(
-                x=alt.X("date:T", title="Date"),
+                x=alt.X("marker_date:T", title="Date"),
                 tooltip=[
                     alt.Tooltip("date:T", title="Date"),
                     alt.Tooltip("type:N", title="Type"),
@@ -156,7 +162,7 @@ def _event_rules_from_events() -> alt.Chart | None:
             alt.Chart(ev_n)
             .mark_rule(strokeWidth=2, color="#bdc3c7", strokeDash=[2, 4])
             .encode(
-                x=alt.X("date:T", title="Date"),
+                x=alt.X("marker_date:T", title="Date"),
                 tooltip=[
                     alt.Tooltip("date:T", title="Date"),
                     alt.Tooltip("type:N", title="Type"),
