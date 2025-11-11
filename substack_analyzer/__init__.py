@@ -3,7 +3,22 @@ try:
 
     __version__ = version("substack-analyzer")
 except PackageNotFoundError:
-    __version__ = "0.0.0+local"
+    # Running from source (not installed). Fall back to pyproject.toml version.
+    try:
+        import tomllib
+        from pathlib import Path
+
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        if pyproject.exists():
+            with pyproject.open("rb") as fh:
+                data = tomllib.load(fh)
+            proj = data.get("project") or {}
+            ver = proj.get("version")
+            __version__ = ver.strip() if isinstance(ver, str) and ver.strip() else "0.0.0+local"
+        else:
+            __version__ = "0.0.0+local"
+    except Exception:
+        __version__ = "0.0.0+local"
 
 from substack_analyzer.model import simulate_growth
 from substack_analyzer.types import AdSpendSchedule, SimulationInputs, SimulationResult
