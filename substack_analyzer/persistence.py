@@ -264,6 +264,53 @@ def _records_to_series(records: list[dict[str, Any]] | None) -> pd.Series | None
     return pd.Series(s.values, index=s.index)
 
 
+def _detect_display_to_code(value: str) -> str:
+    """
+    Normalize UI/display detect mode labels to canonical codes used in artifacts:
+      - "Both (Total+Paid)" -> "both"
+      - "Auto (Total→Free)" or "Auto" or "Default" -> "auto"
+      - "Total" -> "total"
+      - "Free" -> "free"
+      - "Paid" -> "paid"
+    If the input already looks like a code (e.g., 'both'), it is returned lower-cased.
+    """
+    s = str(value or "").strip()
+    if not s:
+        return "auto"
+    low = s.lower()
+    if low in {"auto", "default"} or low.startswith("auto"):
+        return "auto"
+    if low.startswith("both") or "total+paid" in low:
+        return "both"
+    if low.startswith("total"):
+        return "total"
+    if low.startswith("free"):
+        return "free"
+    if low.startswith("paid"):
+        return "paid"
+    # Fallback: return as lower-case to preserve unknown custom values
+    return low
+
+
+def _detect_code_to_display(code: str) -> str:
+    """
+    Map canonical codes to UI/display labels used by the app selectbox.
+    Unknown codes are returned unchanged.
+    """
+    c = str(code or "").strip().lower()
+    if c in {"", "auto", "default"}:
+        return "Auto (Total\u2192Free)"
+    if c == "both":
+        return "Both (Total+Paid)"
+    if c == "total":
+        return "Total"
+    if c == "free":
+        return "Free"
+    if c == "paid":
+        return "Paid"
+    return code
+
+
 def export_phase_one_json() -> bytes:
     """Serialize Phase 1 outputs into a portable JSON artifact.
 
@@ -311,7 +358,8 @@ def export_phase_one_json() -> bytes:
             ad_spend=ad_spend_records,
             adstock_lambda=float(st.session_state.get("adstock_lambda", 0.5)),
             ad_log_theta=float(st.session_state.get("ad_log_theta", 500.0)),
-            detect_mode=str(st.session_state.get("detect_on", "Auto")),
+            # Export canonical code
+            detect_mode=str(st.session_state.get("detect_on", "auto")).strip().lower(),
             detected_target_label=st.session_state.get("detected_target_label"),
             target_col_for_fit=st.session_state.get("detected_target_col"),
         )
@@ -319,24 +367,68 @@ def export_phase_one_json() -> bytes:
 
     # If a model fit is present, include its parameters for Phase 2 equation-based simulation
     fit = st.session_state.get("pwlog_fit")
-    if fit is not None:
-        # Round for readability/portability in JSON
-        def _rf(v: float | None, nd: int = 6) -> float | None:
-            if v is None:
-                return None
-            return round(float(v), nd)
+    # Prefer live overrides from the UI when present; otherwise fall back to the fitted object
 
+    def _rf(v: float | None, nd: int = 6) -> float | None:
+        if v is None:
+            return None
+        return round(float(v), nd)
+
+    k_override = st.session_state.get("modelfit_K")
+    r_override = st.session_state.get("modelfit_r")
+    gp_override = st.session_state.get("modelfit_gamma_pulse")
+    gs_override = st.session_state.get("modelfit_gamma_step")
+    gx_override = st.session_state.get("modelfit_gamma_exog")
+
+    k_val = (
+        float(k_override)
+        if k_override is not None
+        else (float(getattr(fit, "carrying_capacity", 0.0)) if fit is not None else None)
+    )
+    r_list = (
+        list(r_override)
+        if isinstance(r_override, (list, tuple))
+        else (list(getattr(fit, "segment_growth_rates", [])) if fit is not None else None)
+    )
+    gp_val = (
+        float(gp_override)
+        if gp_override is not None
+        else (float(getattr(fit, "gamma_pulse", 0.0)) if fit is not None else 0.0)
+    )
+    gs_val = (
+        float(gs_override)
+        if gs_override is not None
+        else (float(getattr(fit, "gamma_step", 0.0)) if fit is not None else 0.0)
+    )
+    gx_val = (
+        float(gx_override)
+        if gx_override is not None
+        else (
+            float(getattr(fit, "gamma_exog", 0.0))
+            if (fit is not None and getattr(fit, "gamma_exog", None) is not None)
+            else None
+        )
+    )
+    gi_val = float(getattr(fit, "gamma_intercept", 0.0)) if fit is not None else 0.0
+    exog_lag_val = (
+        int(getattr(fit, "exog_lag")) if (fit is not None and getattr(fit, "exog_lag", None) is not None) else None
+    )
+    bkps_list = (
+        list(getattr(fit, "breakpoints", []))
+        if fit is not None
+        else list(st.session_state.get("detected_breakpoints", []) or [])
+    )
+
+    if (k_val is not None) and (r_list is not None) and bkps_list:
         payload["fit_params"] = {
-            "carrying_capacity": int(round(float(getattr(fit, "carrying_capacity", 0.0)))),
-            "segment_growth_rates": [round(float(x), 6) for x in getattr(fit, "segment_growth_rates", [])],
-            "breakpoints": list(getattr(fit, "breakpoints", [])),
-            "gamma_pulse": _rf(float(getattr(fit, "gamma_pulse", 0.0))),
-            "gamma_step": _rf(float(getattr(fit, "gamma_step", 0.0))),
-            "gamma_exog": _rf(
-                (None if getattr(fit, "gamma_exog", None) is None else float(getattr(fit, "gamma_exog")))
-            ),
-            "gamma_intercept": _rf(float(getattr(fit, "gamma_intercept", 0.0))),
-            "exog_lag": (int(getattr(fit, "exog_lag")) if getattr(fit, "exog_lag", None) is not None else None),
+            "carrying_capacity": int(round(float(k_val))),
+            "segment_growth_rates": [round(float(x), 6) for x in r_list],
+            "breakpoints": list(bkps_list),
+            "gamma_pulse": _rf(gp_val),
+            "gamma_step": _rf(gs_val),
+            "gamma_exog": _rf(gx_val),
+            "gamma_intercept": _rf(gi_val),
+            "exog_lag": exog_lag_val,
         }
 
     return json.dumps(payload, indent=2).encode("utf-8")
@@ -373,7 +465,8 @@ def apply_phase_one_json(file_like) -> None:
     st.session_state["detected_change_dates"] = [
         pd.to_datetime(d).to_period("M").to_timestamp("M") for d in (obj.get("breakpoints_dates", []) or [])
     ]
-    st.session_state["detect_on"] = str(obj.get("detect_mode", "Auto"))
+    # Expect canonical codes only
+    st.session_state["detect_on"] = str(obj.get("detect_mode", "auto")).strip().lower()
     st.session_state["detected_target_label"] = obj.get("detected_target_label")
     st.session_state["detected_target_col"] = obj.get("target_col_for_fit")
 

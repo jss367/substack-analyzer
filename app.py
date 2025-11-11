@@ -38,11 +38,11 @@ from substack_analyzer.persistence import (
     export_phase_one_json,
 )
 from substack_analyzer.types import AdSpendSchedule, SimulationInputs
-from substack_analyzer.utils import coerce_list
 from substack_analyzer.ui import format_currency as ui_format_currency
 from substack_analyzer.ui import format_date_badges as ui_format_date_badges
 from substack_analyzer.ui import inject_brand_styles as ui_inject_brand_styles
 from substack_analyzer.ui import render_brand_header as ui_render_brand_header
+from substack_analyzer.utils import coerce_list
 
 # Asset paths
 ASSETS_DIR = Path(__file__).parent / "logos"
@@ -437,17 +437,42 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
     st.subheader("Stage 2: Events & annotations")
     st.caption("Track shout-outs, ad campaigns, launches, etc. Dates must match the series timeline.")
 
-    # Detection mode selector
-    detect_mode = st.selectbox(
+    # Detection mode selector (store canonical code in session_state['detect_on'])
+    _options = ["Both (Total→Paid)", "Both (Total+Paid)", "Auto (Total→Free)", "Total", "Free", "Paid"]
+    # Backward compatible label set (some users may still see arrow variants); pick the first valid display for current code
+    _label_to_code = {
+        "Both (Total+Paid)": "both",
+        "Both (Total→Paid)": "both",
+        "Auto (Total→Free)": "auto",
+        "Total": "total",
+        "Free": "free",
+        "Paid": "paid",
+    }
+    _code_to_label = {
+        "both": "Both (Total+Paid)",
+        "auto": "Auto (Total→Free)",
+        "total": "Total",
+        "free": "Free",
+        "paid": "Paid",
+    }
+    _current_code = str(st.session_state.get("detect_on", "both")).lower()
+    _current_label = _code_to_label.get(_current_code, "Both (Total+Paid)")
+    try:
+        _index = _options.index(_current_label) if _current_label in _options else 0
+    except Exception:
+        _index = 0
+    _selected_label = st.selectbox(
         "Detection target",
-        ["Both (Total+Paid)", "Auto (Total→Free)", "Total", "Free", "Paid"],
-        index=0,
+        _options,
+        index=_index,
         help=(
             "Choose which series to run change-point detection on. "
             "Auto prefers Total (or Free if Total unavailable). Both will detect on Total and Paid and merge."
         ),
-        key="detect_on",
+        key="detect_on_display",
     )
+    detect_mode = _label_to_code.get(_selected_label, "both")
+    st.session_state["detect_on"] = detect_mode
 
     # Add detected change dates
     with st.container():
@@ -498,28 +523,28 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                     detections: list[DetectionResult] = []
                     label_list: list[str] = []
                     # Auto
-                    if detect_mode.startswith("Auto"):
+                    if detect_mode == "auto":
                         s_auto = plot_df[target_col].dropna()
                         detections = [_detect(s_auto)]
                         label_list = [target_col]
                         _log_classified(label_list[0], detections[0].classified)
                     # Explicit targets
-                    elif detect_mode == "Total" and ("Total" in plot_df.columns):
+                    elif detect_mode == "total" and ("Total" in plot_df.columns):
                         detections = [_detect(plot_df["Total"])]
                         label_list = ["Total"]
                         target_col = "Total"
                         _log_classified("Total", detections[0].classified)
-                    elif detect_mode == "Free" and ("Free" in plot_df.columns):
+                    elif detect_mode == "free" and ("Free" in plot_df.columns):
                         detections = [_detect(plot_df["Free"])]
                         label_list = ["Free"]
                         target_col = "Free"
                         _log_classified("Free", detections[0].classified)
-                    elif detect_mode == "Paid" and ("Paid" in plot_df.columns):
+                    elif detect_mode == "paid" and ("Paid" in plot_df.columns):
                         detections = [_detect(plot_df["Paid"])]
                         label_list = ["Paid"]
                         target_col = "Paid"
                         _log_classified("Paid", detections[0].classified)
-                    elif detect_mode.startswith("Both") and ({"Total", "Paid"}.issubset(plot_df.columns)):
+                    elif detect_mode == "both" and ({"Total", "Paid"}.issubset(plot_df.columns)):
                         detections = [_detect(plot_df["Total"]), _detect(plot_df["Paid"])]
                         label_list = ["Total", "Paid"]
                         _log_classified("Total", detections[0].classified)
@@ -555,7 +580,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                         if merged_events_df is not None and not merged_events_df.empty:
                             # When detecting on both series, collapse duplicates by (date, persistence)
                             # to avoid two rows for the same month stemming from Total vs Paid.
-                            if detect_mode.startswith("Both"):
+                            if detect_mode == "both":
                                 merged_events_df = merged_events_df.sort_values("date")
                                 merged_events_df = merged_events_df.drop_duplicates(
                                     subset=["date", "persistence"], keep="first"
@@ -571,7 +596,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             )
                             # Also de-duplicate across the combined table to collapse prior duplicates
                             cleaned_all = _clean_events_df(merged_all)
-                            if detect_mode.startswith("Both") and not cleaned_all.empty:
+                            if detect_mode == "both" and not cleaned_all.empty:
                                 cleaned_all = cleaned_all.sort_values("date")
                                 cleaned_all = cleaned_all.drop_duplicates(subset=["date", "persistence"], keep="first")
                             st.session_state["events_df"] = cleaned_all
@@ -614,7 +639,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                         except Exception:
                             pass
 
-                        if detect_mode.startswith("Both"):
+                        if detect_mode == "both":
                             # Merge by month-end to avoid double-counting near-duplicate breaks across Total/Paid
                             merged_dates = _merge_month_end_dates([b.date for b in seg_effects], min_gap_months=1)
                             base_index = (
@@ -646,7 +671,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                         except Exception:
                             pass
                         # Save a human-readable label of what we detected on
-                        if detect_mode.startswith("Both"):
+                        if detect_mode == "both":
                             st.session_state["detected_target_label"] = "Total+Paid"
                         elif label_list:
                             st.session_state["detected_target_label"] = ",".join(label_list)
