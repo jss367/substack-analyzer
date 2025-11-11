@@ -333,6 +333,7 @@ def export_phase_one_json() -> bytes:
                 (None if getattr(fit, "gamma_exog", None) is None else float(getattr(fit, "gamma_exog")))
             ),
             "gamma_intercept": _rf(float(getattr(fit, "gamma_intercept", 0.0))),
+            "exog_lag": (int(getattr(fit, "exog_lag")) if getattr(fit, "exog_lag", None) is not None else None),
         }
 
     return json.dumps(payload, indent=2).encode("utf-8")

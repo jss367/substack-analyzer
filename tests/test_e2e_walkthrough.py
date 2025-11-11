@@ -119,6 +119,7 @@ def test_e2e_walkthrough_headless():
         segment_growth_rates=fit.segment_growth_rates,
         events_df=st.session_state.get("events_df"),
         extra_exog=exog,
+        extra_exog_lag=fit.exog_lag,
         gamma_pulse=fit.gamma_pulse,
         gamma_step=fit.gamma_step,
         gamma_exog=fit.gamma_exog,

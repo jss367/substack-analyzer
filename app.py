@@ -839,6 +839,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 segment_growth_rates=r_list_now,
                 events_df=st.session_state.get("events_df"),
                 extra_exog=(extra_exog if gx_now is not None else None),
+                extra_exog_lag=(getattr(fit_obj, "exog_lag", None) if gx_now is not None else None),
                 gamma_pulse=float(gp_now),
                 gamma_step=float(gs_now),
                 gamma_exog=(float(gx_now) if gx_now is not None else None),

@@ -503,7 +503,8 @@ def scenario_ads_extremely_valuable():
 
     # Build Total series: negligible organic (r very small), extreme exogenous gain
     total = synthesize_series_with_exog(idx, K=20000.0, r=0.001, exog=exog, g_exog=1000.0)
-
+    total.iat[18] = 11500
+    total.iat[-1] = 19750
     return total
 
 

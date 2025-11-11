@@ -127,13 +127,14 @@ def _build_phase1_ads_extremely_valuable_subplot(ax: plt.Axes) -> None:
     series = scenario_ads_extremely_valuable()
     idx = series.index
     plot_df = pd.DataFrame(index=idx)
-    spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
+    spikes = {idx[6]: 15000.0, idx[18]: 20000.0}
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
     fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
     gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
-    title = f"ads extremely valuable\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
+    lag_txt = f", lag={fit.exog_lag}" if getattr(fit, "exog_lag", None) is not None else ""
+    title = f"ads extremely valuable\n" f"γ_exog={gamma_exog}{lag_txt}, R2Δ={fit.r2_on_deltas:.3f}"
     plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
