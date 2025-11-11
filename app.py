@@ -447,6 +447,36 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                     def _detect(series: pd.Series) -> list:
                         return detect_and_classify(series.dropna(), max_changes=max_changes, window=6)
 
+                    # Debug: record detection configuration
+                    try:
+                        logger.info(
+                            "Detection clicked: mode=%s, max_changes=%s, target_col=%s, plot_cols=%s",
+                            detect_mode,
+                            max_changes,
+                            target_col,
+                            list(plot_df.columns),
+                        )
+                    except Exception:
+                        pass
+
+                    def _log_classified(label: str, classified: list) -> None:
+                        try:
+                            rows = [
+                                {
+                                    "index": int(getattr(b, "index", -1)),
+                                    "date": str(getattr(b, "date", "")),
+                                    "effect": str(getattr(b, "effect", "")),
+                                    "component": str(getattr(b, "component", "")),
+                                    "rate_score": float(getattr(b, "rate_score", 0.0)),
+                                    "level_score": float(getattr(b, "level_score", 0.0)),
+                                    "note": str(getattr(b, "note", "")),
+                                }
+                                for b in (classified or [])
+                            ]
+                            logger.info("Detection raw (%s): %s", label, rows)
+                        except Exception:
+                            pass
+
                     # Determine which series to run on
                     classified_list: list = []
                     label_list: list[str] = []
@@ -455,22 +485,28 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                         s_auto = plot_df[target_col].dropna()
                         classified_list = [_detect(s_auto)]
                         label_list = [target_col]
+                        _log_classified(label_list[0], classified_list[0])
                     # Explicit targets
                     elif detect_mode == "Total" and ("Total" in plot_df.columns):
                         classified_list = [_detect(plot_df["Total"])]
                         label_list = ["Total"]
                         target_col = "Total"
+                        _log_classified("Total", classified_list[0])
                     elif detect_mode == "Free" and ("Free" in plot_df.columns):
                         classified_list = [_detect(plot_df["Free"])]
                         label_list = ["Free"]
                         target_col = "Free"
+                        _log_classified("Free", classified_list[0])
                     elif detect_mode == "Paid" and ("Paid" in plot_df.columns):
                         classified_list = [_detect(plot_df["Paid"])]
                         label_list = ["Paid"]
                         target_col = "Paid"
+                        _log_classified("Paid", classified_list[0])
                     elif detect_mode.startswith("Both") and ({"Total", "Paid"}.issubset(plot_df.columns)):
                         classified_list = [_detect(plot_df["Total"]), _detect(plot_df["Paid"])]
                         label_list = ["Total", "Paid"]
+                        _log_classified("Total", classified_list[0])
+                        _log_classified("Paid", classified_list[1])
                     else:
                         st.info("Requested detection target not available in current data.")
                         classified_list = []
@@ -545,6 +581,20 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             for b in merged_classified
                             if (b.effect == "Persistent" and b.component in {"rate", "mixed"})
                         ]
+                        try:
+                            logger.info(
+                                "Classifier filtered (Persistent & rate/mixed): %s",
+                                [
+                                    {
+                                        "index": int(getattr(b, "index", -1)),
+                                        "date": str(getattr(b, "date", "")),
+                                        "component": str(getattr(b, "component", "")),
+                                    }
+                                    for b in seg_effects
+                                ],
+                            )
+                        except Exception:
+                            pass
 
                         if detect_mode.startswith("Both"):
                             # Merge by month-end to avoid double-counting near-duplicate breaks across Total/Paid
@@ -564,6 +614,19 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             st.session_state["detected_change_dates"] = [s_idx[i] for i in seg_bkps if i < len(s_idx)]
 
                         st.session_state["detected_breakpoints"] = seg_bkps
+                        try:
+                            logger.info(
+                                "Detection result: mode=%s, label=%s, seg_bkps=%s, change_dates=%s",
+                                detect_mode,
+                                ",".join(label_list) if label_list else str(target_col),
+                                seg_bkps,
+                                [
+                                    str(pd.to_datetime(d).date())
+                                    for d in st.session_state.get("detected_change_dates", [])
+                                ],
+                            )
+                        except Exception:
+                            pass
                         # Save a human-readable label of what we detected on
                         if detect_mode.startswith("Both"):
                             st.session_state["detected_target_label"] = "Total+Paid"
