@@ -35,7 +35,12 @@ from substack_analyzer.analysis import (
     read_series,
 )
 from substack_analyzer.calibration import fit_piecewise_logistic
-from substack_analyzer.detection import detect_change_points
+from substack_analyzer.changepoints import (
+    DetectionConfig,
+    DetectionResult,
+    filter_breakpoints,
+    run_detection,
+)
 from substack_analyzer.persistence import export_phase_one_json
 from substack_analyzer.utils import ensure_month_end_index
 
@@ -60,6 +65,14 @@ class PhaseOneConfig:
     lam: float
     theta: float
     out_dir: str
+    detector: str
+    min_seg_len: int
+    penalty_scale: float
+    window: int
+    z_pulse: float
+    rate_factor: float
+    level_factor: float
+    filter_persistent: bool
 
 
 def run_from_phase_one_config(cfg: PhaseOneConfig) -> None:
@@ -79,6 +92,14 @@ def run_from_phase_one_config(cfg: PhaseOneConfig) -> None:
         lam=cfg.lam,
         theta=cfg.theta,
         out_dir=cfg.out_dir,
+        detector=cfg.detector,
+        min_seg_len=cfg.min_seg_len,
+        penalty_scale=cfg.penalty_scale,
+        window=cfg.window,
+        z_pulse=cfg.z_pulse,
+        rate_factor=cfg.rate_factor,
+        level_factor=cfg.level_factor,
+        filter_persistent=cfg.filter_persistent,
     )
 
 
@@ -130,6 +151,15 @@ def run(
     lam: float,
     theta: float,
     out_dir: str,
+    *,
+    detector: str,
+    min_seg_len: int,
+    penalty_scale: float,
+    window: int,
+    z_pulse: float,
+    rate_factor: float,
+    level_factor: float,
+    filter_persistent: bool,
 ) -> None:
     os.makedirs(out_dir, exist_ok=True)
     logger.info("Starting headless run")
@@ -208,8 +238,45 @@ def run(
 
     # Detection target selection and optional merge
 
-    def _detect_indices(series: pd.Series) -> list[int]:
-        return detect_change_points(series.dropna(), max_changes=max_changes, min_seg_len=3, return_mode="indices")
+    detection_cfg = DetectionConfig(
+        use_classifier=(detector == "classifier"),
+        max_changes=max_changes,
+        min_seg_len=min_seg_len,
+        penalty_scale=penalty_scale,
+        window=window,
+        z_pulse=z_pulse,
+        rate_factor=rate_factor,
+        level_factor=level_factor,
+    )
+
+    logger.debug(
+        "Detector cfg: detector=%s, max_changes=%d, min_seg_len=%d, penalty_scale=%.2f, window=%d, filter_persistent=%s",
+        detector,
+        max_changes,
+        min_seg_len,
+        penalty_scale,
+        window,
+        filter_persistent,
+    )
+
+    detection_results: dict[str, DetectionResult] = {}
+
+    def _detect(series: pd.Series, label: str) -> DetectionResult:
+        res = run_detection(series, config=detection_cfg)
+        detection_results[label] = res
+        return res
+
+    def _filtered_indices(result: DetectionResult, filter_segments: bool) -> list[int]:
+        if not result.indices:
+            return []
+        if detection_cfg.use_classifier and filter_segments:
+            filtered = filter_breakpoints(
+                result.classified,
+                effects=["Persistent"],
+                components=["rate", "mixed"],
+            )
+            return sorted({int(b.index) for b in filtered})
+        return result.indices
 
     def _indices_to_dates(series: pd.Series, indices: list[int]) -> list[pd.Timestamp]:
         s_idx = series.dropna().index
@@ -244,27 +311,33 @@ def run(
         )
         if target is None:
             raise SystemExit("No suitable series for detection (Auto mode)")
-        bkps = _detect_indices(target)
+        det = _detect(target, label="auto")
+        bkps = _filtered_indices(det, filter_persistent)
     elif detect_mode == "total":
         if "Total" not in plot_df.columns:
             raise SystemExit("Total series not available for detection")
-        bkps = _detect_indices(plot_df["Total"])
+        det = _detect(plot_df["Total"], label="Total")
+        bkps = _filtered_indices(det, filter_persistent)
         fit_series = plot_df["Total"]
     elif detect_mode == "paid":
         if "Paid" not in plot_df.columns:
             raise SystemExit("Paid series not available for detection")
-        bkps = _detect_indices(plot_df["Paid"])
+        det = _detect(plot_df["Paid"], label="Paid")
+        bkps = _filtered_indices(det, filter_persistent)
         fit_series = plot_df["Paid"]
     elif detect_mode == "free":
         if "Free" not in plot_df.columns:
             raise SystemExit("Free series not available for detection (need Total and Paid)")
-        bkps = _detect_indices(plot_df["Free"])
+        det = _detect(plot_df["Free"], label="Free")
+        bkps = _filtered_indices(det, filter_persistent)
         # Fit preference stays: Total if present else Paid else Free
     elif detect_mode == "both":
         if not {"Total", "Paid"}.issubset(plot_df.columns):
             raise SystemExit("Both mode requires Total and Paid series")
-        b_total = _detect_indices(plot_df["Total"])
-        b_paid = _detect_indices(plot_df["Paid"])
+        det_total = _detect(plot_df["Total"], label="Total")
+        det_paid = _detect(plot_df["Paid"], label="Paid")
+        b_total = _filtered_indices(det_total, filter_persistent)
+        b_paid = _filtered_indices(det_paid, filter_persistent)
         d_total = _indices_to_dates(plot_df["Total"], b_total)
         d_paid = _indices_to_dates(plot_df["Paid"], b_paid)
         d_merged = _merge_dates(d_total + d_paid, min_gap_months=1)
@@ -274,7 +347,12 @@ def run(
         bkps = sorted(set(bkps))
     else:
         raise SystemExit(f"Unknown detect-on mode: {detect_mode}")
-    logger.info("Detection mode=%s, breakpoints=%s", detect_mode, bkps)
+    logger.info(
+        "Detection mode=%s, detector=%s, breakpoints=%s",
+        detect_mode,
+        detector,
+        bkps,
+    )
 
     # Features and optional ad spend (use configured lam/theta)
     ad_file_handle = _open_file(adspend_path) if adspend_path else None
@@ -299,6 +377,10 @@ def run(
     st.session_state["adstock_lambda"] = float(lam_best)
     st.session_state["ad_log_theta"] = float(theta_best)
     st.session_state["detected_breakpoints"] = bkps
+    if detection_results:
+        st.session_state["detected_classified"] = {
+            label: res.classified for label, res in detection_results.items() if res.classified
+        }
     # Map indices to dates based on chosen fit_series base
     try:
         s_idx = fit_series.dropna().index
@@ -336,6 +418,11 @@ def run(
     out_summary = {
         "breakpoints": bkps,
         "detect_on": detect_mode,
+        "detector": detector,
+        "filter_persistent": filter_persistent,
+        "min_seg_len": min_seg_len,
+        "penalty_scale": penalty_scale,
+        "window": window,
         "breakpoints_total": (b_total if 'b_total' in locals() else None),
         "breakpoints_paid": (b_paid if 'b_paid' in locals() else None),
         "carrying_capacity": fit.carrying_capacity,
@@ -466,6 +553,29 @@ def main() -> None:
         choices=["auto", "total", "paid", "free", "both"],
         help="Which series to detect change points on (and merge if both)",
     )
+    p.add_argument(
+        "--detector",
+        type=str,
+        default="classifier",
+        choices=["classifier", "simple"],
+        help="Change-point detector to use (classifier matches Streamlit app)",
+    )
+    p.add_argument("--min-seg-len", type=int, default=2, help="Minimum segment length for detector")
+    p.add_argument(
+        "--penalty-scale",
+        type=float,
+        default=4.0,
+        help="Penalty scale for detector (larger → fewer change points)",
+    )
+    p.add_argument("--window", type=int, default=6, help="Classifier window (months) for slopes/levels")
+    p.add_argument("--z-pulse", type=float, default=3.0, help="Z threshold for transient pulses")
+    p.add_argument("--rate-factor", type=float, default=0.75, help="Rate sensitivity multiplier")
+    p.add_argument("--level-factor", type=float, default=0.75, help="Level sensitivity multiplier")
+    p.add_argument(
+        "--keep-all-breaks",
+        action="store_true",
+        help="When using the classifier, keep all detected breakpoints (skip persistent rate/mixed filter)",
+    )
     p.add_argument("--lam", type=float, default=0.5, help="Adstock lambda carryover [0,1)")
     p.add_argument("--theta", type=float, default=500.0, help="Ad effect log scale")
     p.add_argument("--out-dir", type=str, default="./outputs", help="Output directory")
@@ -488,6 +598,14 @@ def main() -> None:
         lam=args.lam,
         theta=args.theta,
         out_dir=args.out_dir,
+        detector=args.detector,
+        min_seg_len=args.min_seg_len,
+        penalty_scale=args.penalty_scale,
+        window=args.window,
+        z_pulse=args.z_pulse,
+        rate_factor=args.rate_factor,
+        level_factor=args.level_factor,
+        filter_persistent=not args.keep_all_breaks,
     )
     run_from_phase_one_config(cfg)
 

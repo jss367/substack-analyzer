@@ -1,7 +1,13 @@
 import pandas as pd
 
 from substack_analyzer.calibration import fit_piecewise_logistic
-from substack_analyzer.changepoints import breakpoints_for_segments, breakpoints_to_events, detect_and_classify
+from substack_analyzer.changepoints import (
+    DetectionConfig,
+    breakpoints_for_segments,
+    breakpoints_to_events,
+    detect_and_classify,
+    run_detection,
+)
 from substack_analyzer.detection import detect_change_points
 
 
@@ -98,3 +104,28 @@ def test_detect_change_points_smoke():
     s = pd.Series([100, 105, 110, 115, 120, 125, 150, 155, 160, 165, 170, 175], index=idx)
     bkps = detect_change_points(s, max_changes=3, return_mode="indices")
     assert isinstance(bkps, list)
+
+
+def test_run_detection_matches_helpers():
+    idx = pd.period_range("2021-01", periods=18, freq="M").to_timestamp("M")
+    s = pd.Series(
+        [100, 101, 103, 104, 150, 151, 152, 160, 162, 164, 166, 210, 212, 214, 216, 218, 220, 222],
+        index=idx,
+    )
+
+    cfg = DetectionConfig(use_classifier=True, max_changes=4, window=4)
+    result = run_detection(s, config=cfg)
+    expected_classified = detect_and_classify(s, max_changes=4, window=4)
+    assert result.classified == expected_classified
+    assert result.indices == sorted({b.index for b in expected_classified})
+
+    simple_cfg = DetectionConfig(use_classifier=False, max_changes=4, min_seg_len=3)
+    simple_result = run_detection(s, config=simple_cfg)
+    expected_indices = detect_change_points(
+        s,
+        max_changes=4,
+        min_seg_len=3,
+        return_mode="indices",
+    )
+    assert simple_result.classified == []
+    assert simple_result.indices == sorted(expected_indices)

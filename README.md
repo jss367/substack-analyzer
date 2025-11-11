@@ -23,6 +23,7 @@ Notes:
 - `--all` and/or `--paid` should each point to a two-column file (date, count). Use `--*-has-header` and `--*-date-col`/`--*-count-col` to specify header presence and column indices or names.
 - `--events` (optional) CSV columns: `date`, `type`, `persistence`, `cost`.
 - `--adspend` (optional) CSV/XLSX columns: `date`, `spend`.
+- Change-point detector settings (classifier vs. simple, filtering, sensitivity) are documented in [docs/detection-modes.md](docs/detection-modes.md).
 - Outputs include `summary.json`, `fitted_series.csv`, `features.csv`, and `covariates.csv` in `--out-dir`.
 
 ## What this does
