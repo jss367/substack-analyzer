@@ -57,11 +57,5 @@ Notes:
 - Annual plan revenue is amortized evenly across months if enabled.
 - Attribution/organic separation will vary by how you tag campaigns and sources.
 
-## Next ideas
-
-- Pull Substack exports (CSV) to auto-populate baselines
-- Scenario comparison and sensitivity analysis
-- Cohort-based conversion and churn curves
-- Funnel from traffic by source to free signups to premium
 
 See the design document for the end-to-end flow, stage inputs/outputs, and data contracts: [DESIGN.md](./DESIGN.md)
