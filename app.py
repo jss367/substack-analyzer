@@ -11,8 +11,8 @@ import streamlit.components.v1 as components
 from streamlit.logger import get_logger
 
 from substack_analyzer.analysis import (
-    DEFAULT_ADSTOCK_LAMBDA,
     DEFAULT_AD_LOG_THETA,
+    DEFAULT_ADSTOCK_LAMBDA,
     build_events_features,
     compute_estimates,
     derive_adds_churn,
@@ -793,9 +793,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if "modelfit_r" not in st.session_state:
                 st.session_state["modelfit_r"] = list(getattr(fit, "segment_growth_rates", []) or [])
             if "modelfit_intercepts" not in st.session_state:
-                st.session_state["modelfit_intercepts"] = list(
-                    getattr(fit, "segment_intercepts", []) or []
-                )
+                st.session_state["modelfit_intercepts"] = list(getattr(fit, "segment_intercepts", []) or [])
 
             # ----- read current overrides & recompute fitted line with them -----
             def _current_fit_params():
@@ -805,9 +803,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     st.session_state.get("modelfit_r", list(getattr(fit_obj, "segment_growth_rates", []) or []))
                 )
                 intercepts = list(
-                    st.session_state.get(
-                        "modelfit_intercepts", list(getattr(fit_obj, "segment_intercepts", []) or [])
-                    )
+                    st.session_state.get("modelfit_intercepts", list(getattr(fit_obj, "segment_intercepts", []) or []))
                 )
                 gp_val = float(
                     st.session_state.get("modelfit_gamma_pulse", getattr(fit_obj, "gamma_pulse", 0.0) or 0.0)
@@ -825,7 +821,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 segment_growth_rates=r_list_now,
                 events_df=st.session_state.get("events_df"),
                 extra_exog=(extra_exog if gx_now is not None else None),
-                extra_exog_lag=(getattr(fit_obj, "exog_lag", None) if gx_now is not None else None),
+                extra_exog_lag=(getattr(fit, "exog_lag", None) if gx_now is not None else None),
                 gamma_pulse=float(gp_now),
                 gamma_step=float(gs_now),
                 gamma_exog=(float(gx_now) if gx_now is not None else None),
