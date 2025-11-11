@@ -1,13 +1,14 @@
 import math
 from contextlib import suppress
 from pathlib import Path
-from typing import IO, Sequence
+from typing import IO
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from substack_analyzer.calibration import fit_piecewise_logistic
+DEFAULT_ADSTOCK_LAMBDA: float = 0.5
+DEFAULT_AD_LOG_THETA: float = 500.0
 
 
 def read_series(file_like, has_header: bool, date_sel, count_sel) -> pd.Series:
@@ -59,6 +60,107 @@ def read_series(file_like, has_header: bool, date_sel, count_sel) -> pd.Series:
     if not s.empty:
         s = s.resample("ME").last().dropna()
     return s
+
+
+def _parse_fb_date_series(values: pd.Series) -> pd.Series:
+    """
+    Parse dates from Facebook-style exports where a date column might be a single
+    day (e.g., reporting end) or a range like 'YYYY-MM-DD - YYYY-MM-DD'.
+    Falls back to pandas' generic parser on failure.
+    """
+    v = values.astype(str)
+    with suppress(Exception):
+        right = v.str.split(" - ").str[-1]
+        dt = pd.to_datetime(right, errors="coerce")
+        if dt.notna().any():
+            return dt
+    return pd.to_datetime(v, errors="coerce")
+
+
+def _infer_ad_spend_date_spend(ad_df: pd.DataFrame) -> pd.DataFrame | None:
+    """
+    Return a DataFrame with columns {'date','spend'} inferred from common schemas.
+    Supports:
+      - Already normalized files with 'date' and 'spend'
+      - Facebook Ads Manager exports with columns like:
+        - 'Amount spent (USD)' for spend
+        - 'Reporting ends' (preferred), 'Reporting end', 'End date', 'Month', or 'Date' for date
+    Returns None if no valid mapping can be inferred.
+    """
+    if {"date", "spend"}.issubset(ad_df.columns):
+        df = ad_df[["date", "spend"]].copy()
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df["spend"] = pd.to_numeric(df["spend"], errors="coerce")
+        return df.dropna(subset=["date", "spend"])
+
+    cols_lower = {c.lower(): c for c in ad_df.columns}
+    # Guess spend column
+    spend_col_guess: str | None = None
+    for lc, orig in cols_lower.items():
+        if lc == "spend":
+            spend_col_guess = orig
+            break
+        if ("amount" in lc) and (("spent" in lc) or ("spend" in lc)):
+            spend_col_guess = orig
+            break
+    # Guess date column (prefer reporting ends, then fallbacks)
+    date_col_guess: str | None = None
+    for key in ["reporting ends", "reporting end", "end date", "month", "date"]:
+        if key in cols_lower:
+            date_col_guess = cols_lower[key]
+            break
+
+    if spend_col_guess is None or date_col_guess is None:
+        return None
+
+    df2 = (
+        ad_df[[date_col_guess, spend_col_guess]]
+        .rename(columns={date_col_guess: "date", spend_col_guess: "spend"})
+        .copy()
+    )
+    with suppress(Exception):
+        df2["date"] = _parse_fb_date_series(df2["date"])
+    df2["spend"] = pd.to_numeric(df2["spend"], errors="coerce")
+    return df2.dropna(subset=["date", "spend"])
+
+
+def _read_any_tabular(ad_file: str | Path | IO[str] | IO[bytes]) -> pd.DataFrame:
+    """
+    Read CSV/XLSX from a path or file-like object with robust fallbacks.
+    Prefers Excel if the suffix indicates; otherwise tries CSV first then Excel.
+    """
+    # Path-like
+    if isinstance(ad_file, (str, Path)):
+        suffix = (Path(ad_file).suffix or "").lower()
+        if suffix in {".xlsx", ".xls"}:
+            return pd.read_excel(ad_file)
+        return pd.read_csv(ad_file)
+
+    # File-like
+    name = getattr(ad_file, "name", "")
+    if isinstance(name, str) and name.lower().endswith((".xlsx", ".xls")):
+        return pd.read_excel(ad_file)
+    with suppress(Exception):
+        ad_file.seek(0)
+    try:
+        return pd.read_csv(ad_file)
+    except Exception:
+        with suppress(Exception):
+            ad_file.seek(0)
+        return pd.read_excel(ad_file)
+
+
+def _to_monthly_spend(df: pd.DataFrame, monthly_index: pd.DatetimeIndex) -> pd.Series:
+    """
+    Convert a normalized {'date','spend'} DataFrame to a monthly Series aligned
+    to `monthly_index` by collapsing to month-end and summing.
+    """
+    df2 = df.copy()
+    df2["date"] = pd.to_datetime(df2["date"], errors="coerce")
+    df2 = df2.dropna(subset=["date"])
+    df2["date"] = df2["date"].dt.to_period("M").dt.to_timestamp("M")
+    monthly = df2.groupby("date", as_index=True)["spend"].sum().sort_index()
+    return monthly.reindex(monthly_index).fillna(0.0)
 
 
 def plot_series(plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, series_title: str) -> alt.Chart:
@@ -209,8 +311,8 @@ def compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | Non
 
 def build_events_features(
     plot_df: pd.DataFrame,
-    lam: float = 0.1,
-    theta: float = 100.0,
+    lam: float = DEFAULT_ADSTOCK_LAMBDA,
+    theta: float = DEFAULT_AD_LOG_THETA,
     ad_file: str | Path | IO[str] | IO[bytes] | None = None,
 ):
     """Build monthly covariates/features from Events and optional ad spend.
@@ -291,33 +393,10 @@ def build_events_features(
     ad_spend = pd.Series(0.0, index=monthly_index, name="ad_spend")
     if ad_file is not None:
         try:
-            # Accept path-like strings or file-like objects
-            if isinstance(ad_file, (str, Path)):
-                suffix = (Path(ad_file).suffix or "").lower()
-                if suffix in {".xlsx", ".xls"}:
-                    ad_df = pd.read_excel(ad_file)
-                else:
-                    ad_df = pd.read_csv(ad_file)
-            else:
-                # File-like: use extension hint if available; otherwise try CSV then Excel
-                name = getattr(ad_file, "name", "")
-                if isinstance(name, str) and name.lower().endswith((".xlsx", ".xls")):
-                    ad_df = pd.read_excel(ad_file)
-                else:
-                    with suppress(Exception):
-                        ad_file.seek(0)
-                    try:
-                        ad_df = pd.read_csv(ad_file)
-                    except Exception:
-                        with suppress(Exception):
-                            ad_file.seek(0)
-                        ad_df = pd.read_excel(ad_file)
-            if {"date", "spend"}.issubset(ad_df.columns):
-                ad_df = ad_df.assign(date=lambda d: pd.to_datetime(d["date"]))
-                ad_df = ad_df.dropna(subset=["date"])
-                ad_df["date"] = ad_df["date"].dt.to_period("M").dt.to_timestamp("M")
-                ad_df = ad_df.groupby("date", as_index=True)["spend"].sum().sort_index()
-                ad_spend = ad_df.reindex(monthly_index).fillna(0.0)
+            ad_df = _read_any_tabular(ad_file)
+            normalized = _infer_ad_spend_date_spend(ad_df)
+            if normalized is not None and not normalized.empty:
+                ad_spend = _to_monthly_spend(normalized, monthly_index)
         except Exception as e:
             st.error(
                 "Failed to read Ad Spend file. Ensure it has columns 'date' (YYYY-MM-DD) and 'spend'.\n" f"Details: {e}"
@@ -383,59 +462,3 @@ def derive_adds_churn(plot_df: pd.DataFrame, churn_free_est: float, churn_paid_e
     adds_df = pd.DataFrame(adds_rows).set_index("date") if adds_rows else pd.DataFrame()
     churn_df = pd.DataFrame(churn_rows).set_index("date") if churn_rows else pd.DataFrame()
     return adds_df, churn_df
-
-
-def auto_tune_adstock(
-    plot_df: pd.DataFrame,
-    *,
-    ad_file,
-    breakpoints: list[int],
-    events_df: pd.DataFrame | None,
-    fit_series: pd.Series | None,
-    lam_grid: Sequence[float] = (0.0, 0.2, 0.4, 0.6, 0.8, 0.9),
-    theta_grid: Sequence[float] = (100.0, 250.0, 500.0, 1000.0, 2000.0),
-) -> tuple[float, float, pd.DataFrame, pd.DataFrame]:
-    """Grid-search (lambda, theta) to minimize SSE on piecewise-logistic fit with log ad-effect as exogenous.
-
-    Returns (lam_best, theta_best, covariates_df, features_df).
-    """
-    lam_best: float = 0.5
-    theta_best: float = 500.0
-    best_sse = float("inf")
-    covariates_df = pd.DataFrame(index=plot_df.index)
-    features_df = pd.DataFrame(index=plot_df.index)
-
-    for lam_try in lam_grid:
-        for theta_try in theta_grid:
-            try:
-                # Rewind file-like ad_file if possible to ensure repeated reads work headless
-                if hasattr(ad_file, "seek"):
-                    with suppress(Exception):
-                        ad_file.seek(0)
-                cov_try, feat_try = build_events_features(
-                    plot_df, lam=float(lam_try), theta=float(theta_try), ad_file=ad_file
-                )
-                exog = feat_try["ad_effect_log"].astype(float) if "ad_effect_log" in feat_try.columns else None
-                if fit_series is None or exog is None:
-                    continue
-                fit_try = fit_piecewise_logistic(
-                    total_series=fit_series,
-                    breakpoints=list(breakpoints or []),
-                    events_df=events_df,
-                    extra_exog=exog,
-                )
-                sse_try = float(getattr(fit_try, "sse", float("inf")))
-                if sse_try < best_sse:
-                    best_sse = sse_try
-                    lam_best = float(lam_try)
-                    theta_best = float(theta_try)
-                    covariates_df, features_df = cov_try, feat_try
-            except Exception:
-                continue
-
-    # Fallback to a single build if no combination succeeded
-    if features_df.empty:
-        covariates_df, features_df = build_events_features(
-            plot_df, lam=float(lam_best), theta=float(theta_best), ad_file=ad_file
-        )
-    return lam_best, theta_best, covariates_df, features_df

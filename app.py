@@ -11,7 +11,8 @@ import streamlit.components.v1 as components
 from streamlit.logger import get_logger
 
 from substack_analyzer.analysis import (
-    auto_tune_adstock,
+    DEFAULT_ADSTOCK_LAMBDA,
+    DEFAULT_AD_LOG_THETA,
     build_events_features,
     compute_estimates,
     derive_adds_churn,
@@ -632,7 +633,9 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
 
 def events_features_ui(plot_df: pd.DataFrame) -> None:
     with st.expander("Stage 2: Events & Features (monthly)", expanded=False):
-        st.caption("Encodes pulse/step features from Events and optional ad spend. Auto-tunes adstock λ and log θ.")
+        st.caption(
+            "Encodes pulse/step features from Events and optional ad spend using the fixed ad response parameters."
+        )
         # Optional ad spend file
         ad_file = st.file_uploader("Optional: Ad spend CSV (date, spend)", type=["csv", "xlsx", "xls"], key="ad_csv")
 
@@ -640,38 +643,21 @@ def events_features_ui(plot_df: pd.DataFrame) -> None:
         _ev_backup = st.session_state.get("events_df", pd.DataFrame(columns=EVENTS_COLUMNS))
         st.session_state["events_df"] = _ev_backup.copy(deep=True)
         try:
-            # Auto-tune lambda and theta when ad spend is provided; else use defaults
-            lam_best: float = 0.5
-            theta_best: float = 500.0
-            covariates_df: pd.DataFrame
-            features_df: pd.DataFrame
-
-            if ad_file is not None:
-                fit_series_source = plot_df.get("Total") if "Total" in plot_df.columns else plot_df.get("Free")
-                bkps = list(st.session_state.get("detected_breakpoints", []) or [])
-                events_df_local = st.session_state.get("events_df")
-                lam_best, theta_best, covariates_df, features_df = auto_tune_adstock(
-                    plot_df,
-                    ad_file=ad_file,
-                    breakpoints=bkps,
-                    events_df=events_df_local,
-                    fit_series=fit_series_source,
-                )
-            else:
-                # No ad spend file: build only pulse/step; defaults for lam/theta kept
-                covariates_df, features_df = build_events_features(
-                    plot_df, lam=lam_best, theta=theta_best, ad_file=ad_file
-                )
+            lam_current = float(st.session_state.get("adstock_lambda", DEFAULT_ADSTOCK_LAMBDA))
+            theta_current = float(st.session_state.get("ad_log_theta", DEFAULT_AD_LOG_THETA))
+            covariates_df, features_df = build_events_features(
+                plot_df, lam=lam_current, theta=theta_current, ad_file=ad_file
+            )
         finally:
             # Always restore the user-owned table, even if the builder throws
             st.session_state["events_df"] = _ev_backup
         # ------------------------------------------------------------------------------
 
-        st.session_state["adstock_lambda"] = float(lam_best)
-        st.session_state["ad_log_theta"] = float(theta_best)
+        st.session_state["adstock_lambda"] = float(lam_current)
+        st.session_state["ad_log_theta"] = float(theta_current)
         st.session_state["covariates_df"] = covariates_df
         st.session_state["features_df"] = features_df
-        st.markdown(f"**Auto-selected**: λ={lam_best:0.2f}, θ={theta_best:0.0f}")
+        st.markdown(f"Using λ={lam_current:0.2f}, θ={theta_current:0.0f} (adjustable from the sidebar).")
         st.markdown("**Outputs**: `events_df` (above), `covariates_df`, `features_df`.")
         st.dataframe(features_df.reset_index(), width="stretch")
         # Log Phase 1 readiness for Phase 2 handoff
@@ -1254,14 +1240,14 @@ def sidebar_inputs() -> SimulationInputs:
             "Adstock lambda (carryover)",
             min_value=0.0,
             max_value=0.99,
-            default_value=float(_get_state("adstock_lambda", 0.5)),
+            default_value=float(_get_state("adstock_lambda", DEFAULT_ADSTOCK_LAMBDA)),
             step=0.01,
             key="adstock_lambda",
         )
         theta_sb = number_input_state(
             "Log transform theta",
             min_value=1.0,
-            default_value=float(_get_state("ad_log_theta", 500.0)),
+            default_value=float(_get_state("ad_log_theta", DEFAULT_AD_LOG_THETA)),
             step=50.0,
             key="ad_log_theta",
         )

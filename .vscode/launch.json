@@ -137,6 +137,18 @@
                 "PYTHONPATH": "/Users/julius/git/substack-analyzer"
             },
             "justMyCode": true
+        },
+        {
+            "name": "Python: plot_monthly_adds.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/Users/julius/git/substack-analyzer/scripts/plot_monthly_adds.py",
+            "cwd": "/Users/julius/git/substack-analyzer",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "/Users/julius/git/substack-analyzer"
+            },
+            "justMyCode": true
         }
     ]
 }

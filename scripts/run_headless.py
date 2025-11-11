@@ -27,7 +27,13 @@ import coloredlogs
 import pandas as pd
 import streamlit as st
 
-from substack_analyzer.analysis import auto_tune_adstock, build_events_features, compute_estimates, read_series
+from substack_analyzer.analysis import (
+    DEFAULT_AD_LOG_THETA,
+    DEFAULT_ADSTOCK_LAMBDA,
+    build_events_features,
+    compute_estimates,
+    read_series,
+)
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.detection import detect_change_points
 from substack_analyzer.persistence import export_phase_one_json
@@ -270,23 +276,13 @@ def run(
         raise SystemExit(f"Unknown detect-on mode: {detect_mode}")
     logger.info("Detection mode=%s, breakpoints=%s", detect_mode, bkps)
 
-    # Features and optional ad spend (auto-tune lam/theta if ad spend provided)
+    # Features and optional ad spend (use configured lam/theta)
     ad_file_handle = _open_file(adspend_path) if adspend_path else None
-    lam_best = float(lam)
-    theta_best = float(theta)
-    if ad_file_handle is not None:
-        lam_best, theta_best, covariates_df, features_df = auto_tune_adstock(
-            plot_df,
-            ad_file=ad_file_handle,
-            breakpoints=bkps,
-            events_df=st.session_state.get("events_df"),
-            fit_series=fit_series,
-        )
-        logger.info("Auto-selected adstock: lambda=%.2f, theta=%.0f", lam_best, theta_best)
-    else:
-        covariates_df, features_df = build_events_features(
-            plot_df, lam=lam_best, theta=theta_best, ad_file=ad_file_handle
-        )
+    lam_best = float(lam) if lam is not None else DEFAULT_ADSTOCK_LAMBDA
+    theta_best = float(theta) if theta is not None else DEFAULT_AD_LOG_THETA
+    covariates_df, features_df = build_events_features(
+        plot_df, lam=lam_best, theta=theta_best, ad_file=ad_file_handle
+    )
 
     if adspend_path:
         ad_sum = float(covariates_df["ad_spend"].sum()) if "ad_spend" in covariates_df.columns else 0.0

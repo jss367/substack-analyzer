@@ -23,7 +23,7 @@ def synthesize_series_with_exog(
     exog_vals = exog.reindex(idx).astype(float).fillna(0.0).to_numpy() if exog is not None else np.zeros(len(idx))
     step_vals = step.reindex(idx).astype(float).fillna(0.0).to_numpy() if step is not None else np.zeros(len(idx))
     for t in range(1, len(idx)):
-        x = s_vals[-1] * (1.0 - s_vals[-1] / float(K))
+        x = s_vals[-1] * (1.0 - s_vals[-1] / K)
         delta = r * x + g_exog * float(exog_vals[t - 1]) + g_step * float(step_vals[t - 1])
         s_vals.append(max(s_vals[-1] + delta, 0.0))
     return pd.Series(np.asarray(s_vals, dtype=float), index=idx, name="Total").round().astype(int)
