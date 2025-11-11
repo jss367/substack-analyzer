@@ -25,7 +25,7 @@ def test_phase1_ads_really_valuable_phase1_json():
     spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
-    exog = features_df["ad_effect_log"].astype(float)
+    exog = features_df["ad_effect_log"].astype(float).shift(1).fillna(0.0)
 
     bkps = detect_change_points(total, max_changes=4, min_seg_len=3, return_mode="indices")
 
@@ -52,7 +52,7 @@ def test_phase1_ads_have_no_effect_phase1_json():
     spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
-    exog = features_df["ad_effect_log"].astype(float)
+    exog = features_df["ad_effect_log"].astype(float).shift(1).fillna(0.0)
 
     bkps = detect_change_points(total, max_changes=4, min_seg_len=3, return_mode="indices")
 
@@ -83,7 +83,7 @@ def test_phase1_ads_really_valuable_fit_with_exog():
     spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _cov, features_df = build_events_features(plot_df, ad_file=ad_file)
-    exog = features_df["ad_effect_log"].astype(float)
+    exog = features_df["ad_effect_log"].astype(float).shift(1).fillna(0.0)
 
     # Fit with exogenous regressor; no structural breakpoints in this scenario
     fit = fit_piecewise_logistic(series, breakpoints=[], extra_exog=exog)
@@ -92,8 +92,8 @@ def test_phase1_ads_really_valuable_fit_with_exog():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 1
     # Deterministic construction; should explain nearly all variance in deltas
-    assert fit.r2_on_deltas > 0.95
-    assert fit.sse <= 2000
+    assert fit.r2_on_deltas > 0.99
+    assert fit.sse <= 50
 
 
 def test_phase1_ads_extremely_valuable_fit_with_exog():
@@ -106,7 +106,7 @@ def test_phase1_ads_extremely_valuable_fit_with_exog():
     spikes = {idx[6]: 15000.0, idx[18]: 20000.0}
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _cov, features_df = build_events_features(plot_df, ad_file=ad_file)
-    exog = features_df["ad_effect_log"].astype(float)
+    exog = features_df["ad_effect_log"].astype(float).shift(1).fillna(0.0)
 
     # Fit with exogenous regressor; no structural breakpoints in this scenario
     fit = fit_piecewise_logistic(series, breakpoints=[], extra_exog=exog)
@@ -115,8 +115,8 @@ def test_phase1_ads_extremely_valuable_fit_with_exog():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 1
     # The exogenous signal should almost perfectly explain monthly changes
-    assert fit.r2_on_deltas > 0.1  # ignore this metric
-    assert fit.sse <= 500000000
+    assert fit.r2_on_deltas > 0.999
+    assert fit.sse <= 20
 
 
 def test_top_tier_sustained_marketing_series_fit():
