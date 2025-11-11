@@ -163,7 +163,6 @@ def test_fit_piecewise_logistic_on_gm_series():
     assert fit.sse <= 1200.0
 
 
-
 def test_fit_piecewise_logistic_with_cy_series():
     """
     Slow growth then a faster growth rate
@@ -193,7 +192,7 @@ def test_fit_piecewise_logistic_with_cy_series():
     if len(fit.segment_growth_rates) >= 2:
         # Later growth should be faster than the early growth in this scenario
         assert fit.segment_growth_rates[-1] > fit.segment_growth_rates[0]
-    assert fit.sse >= 0.0
+    assert fit.sse <= 20
 
 
 def test_phase1_ads_spiky_spend_phase1_json():

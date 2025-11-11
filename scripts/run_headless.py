@@ -358,7 +358,7 @@ def run(
     # Write artifacts
     try:
         fit.fitted_series.to_csv(out_dir_path / "fitted_series.csv", header=["fitted"], index_label="date")
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to write fitted_series.csv")
         raise
     ev_out = st.session_state.get("events_df")
