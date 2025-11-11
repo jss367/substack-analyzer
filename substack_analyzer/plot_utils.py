@@ -60,8 +60,17 @@ def plot_fit_vs_actual(
     if show_breakpoints and getattr(fit, "breakpoints", None):
         idx = actual.index
         for b in fit.breakpoints:
-            if isinstance(b, int) and 0 <= b < len(idx):
-                ax.axvline(idx[b], color="#DB4437", linestyle="--", linewidth=1.2)
+            if not isinstance(b, int):
+                continue
+
+            if b <= 0:
+                boundary_index = 0
+            elif b < len(idx):
+                boundary_index = b - 1
+            else:
+                continue
+
+            ax.axvline(idx[boundary_index], color="#DB4437", linestyle="--", linewidth=1.2)
 
     ax.set_title(title)
     ax.set_ylabel("Subscribers")
