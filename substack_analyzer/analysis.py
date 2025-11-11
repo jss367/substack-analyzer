@@ -1,13 +1,14 @@
 import math
 from contextlib import suppress
 from pathlib import Path
-from typing import IO, Sequence
+from typing import IO
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from substack_analyzer.calibration import fit_piecewise_logistic
+DEFAULT_ADSTOCK_LAMBDA: float = 0.5
+DEFAULT_AD_LOG_THETA: float = 500.0
 
 
 def read_series(file_like, has_header: bool, date_sel, count_sel) -> pd.Series:
@@ -209,8 +210,8 @@ def compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | Non
 
 def build_events_features(
     plot_df: pd.DataFrame,
-    lam: float = 0.1,
-    theta: float = 100.0,
+    lam: float = DEFAULT_ADSTOCK_LAMBDA,
+    theta: float = DEFAULT_AD_LOG_THETA,
     ad_file: str | Path | IO[str] | IO[bytes] | None = None,
 ):
     """Build monthly covariates/features from Events and optional ad spend.
@@ -383,59 +384,3 @@ def derive_adds_churn(plot_df: pd.DataFrame, churn_free_est: float, churn_paid_e
     adds_df = pd.DataFrame(adds_rows).set_index("date") if adds_rows else pd.DataFrame()
     churn_df = pd.DataFrame(churn_rows).set_index("date") if churn_rows else pd.DataFrame()
     return adds_df, churn_df
-
-
-def auto_tune_adstock(
-    plot_df: pd.DataFrame,
-    *,
-    ad_file,
-    breakpoints: list[int],
-    events_df: pd.DataFrame | None,
-    fit_series: pd.Series | None,
-    lam_grid: Sequence[float] = (0.0, 0.2, 0.4, 0.6, 0.8, 0.9),
-    theta_grid: Sequence[float] = (100.0, 250.0, 500.0, 1000.0, 2000.0),
-) -> tuple[float, float, pd.DataFrame, pd.DataFrame]:
-    """Grid-search (lambda, theta) to minimize SSE on piecewise-logistic fit with log ad-effect as exogenous.
-
-    Returns (lam_best, theta_best, covariates_df, features_df).
-    """
-    lam_best: float = 0.5
-    theta_best: float = 500.0
-    best_sse = float("inf")
-    covariates_df = pd.DataFrame(index=plot_df.index)
-    features_df = pd.DataFrame(index=plot_df.index)
-
-    for lam_try in lam_grid:
-        for theta_try in theta_grid:
-            try:
-                # Rewind file-like ad_file if possible to ensure repeated reads work headless
-                if hasattr(ad_file, "seek"):
-                    with suppress(Exception):
-                        ad_file.seek(0)
-                cov_try, feat_try = build_events_features(
-                    plot_df, lam=float(lam_try), theta=float(theta_try), ad_file=ad_file
-                )
-                exog = feat_try["ad_effect_log"].astype(float) if "ad_effect_log" in feat_try.columns else None
-                if fit_series is None or exog is None:
-                    continue
-                fit_try = fit_piecewise_logistic(
-                    total_series=fit_series,
-                    breakpoints=list(breakpoints or []),
-                    events_df=events_df,
-                    extra_exog=exog,
-                )
-                sse_try = float(getattr(fit_try, "sse", float("inf")))
-                if sse_try < best_sse:
-                    best_sse = sse_try
-                    lam_best = float(lam_try)
-                    theta_best = float(theta_try)
-                    covariates_df, features_df = cov_try, feat_try
-            except Exception:
-                continue
-
-    # Fallback to a single build if no combination succeeded
-    if features_df.empty:
-        covariates_df, features_df = build_events_features(
-            plot_df, lam=float(lam_best), theta=float(theta_best), ad_file=ad_file
-        )
-    return lam_best, theta_best, covariates_df, features_df
