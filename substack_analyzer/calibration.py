@@ -80,6 +80,7 @@ def fit_piecewise_logistic(
     events_df: pd.DataFrame | None = None,
     k_grid: Sequence[float] | None = None,
     extra_exog: pd.Series | None = None,
+    exog_lags: Sequence[int] | None = None,
 ) -> PiecewiseLogisticFit:
     """Fit a piecewise-logistic model on monthly totals via grid-search over K and OLS.
 
@@ -90,6 +91,11 @@ def fit_piecewise_logistic(
     - K (carrying capacity) is shared across segments and chosen by grid-search.
     - γ_pulse, γ_step, γ_exog are global coefficients.
     - Parameters are estimated by OLS on ΔS_t for each candidate K; pick K with lowest SSE.
+
+    When ``extra_exog`` is provided, the fitter will, by default, evaluate both contemporaneous
+    alignment and a one-period lag (``exog_lags`` defaults to ``[0, 1]``) so that callers that
+    constructed their feature on the total-series index do not need to manually shift it to match
+    the ΔS index.
     """
     input_series = ensure_month_end_index(total_series)
     if input_series.size < 4:
@@ -111,15 +117,29 @@ def fit_piecewise_logistic(
     pulse = np.asarray(pd.Series(pulse, index=y.index), dtype=float)
     step = np.asarray(pd.Series(step, index=y.index), dtype=float)
 
-    # Optional exogenous aligned to y index
-    exog = None
+    # Optional exogenous aligned to y index (support trying simple integer lags)
+    exog_candidates: list[tuple[int | None, np.ndarray | None]] = [(None, None)]
     if extra_exog is not None:
-        try:
-            exog = extra_exog.reindex(y.index).astype(float).to_numpy()
-            # Replace nans with zeros
-            exog = np.where(np.isfinite(exog), exog, 0.0)
-        except Exception:
-            exog = None
+        candidate_lags = (
+            [int(l) for l in exog_lags]
+            if exog_lags is not None
+            else [0, 1]
+        )
+        unique_lags = []
+        for lag in candidate_lags:
+            if lag not in unique_lags:
+                unique_lags.append(lag)
+        exog_candidates = []
+        for lag in unique_lags:
+            try:
+                series_to_align = extra_exog.shift(int(lag)) if lag else extra_exog
+                exog_arr = series_to_align.reindex(y.index).astype(float).to_numpy()
+                exog_arr = np.where(np.isfinite(exog_arr), exog_arr, 0.0)
+                exog_candidates.append((int(lag), exog_arr))
+            except Exception:
+                continue
+        if not exog_candidates:
+            exog_candidates = [(None, None)]
 
     # K grid to do grid search for carrying capacity
     max_s = float(input_series.max())
@@ -138,6 +158,7 @@ def fit_piecewise_logistic(
 
     best: PiecewiseLogisticFit | None = None
     best_sse = np.inf
+    best_exog_lag: int | None = None
 
     # Precompute Δ-space segment masks for efficiency and stability
     masks: list[np.ndarray] = []
@@ -155,80 +176,106 @@ def fit_piecewise_logistic(
         for mask in masks[1:]:
             intercept_masks.append(mask.copy())
 
-    for K in k_grid:
-        X_base = (s_lag * (1.0 - s_lag / K)).to_numpy().astype(float)
-        # Build design matrix from precomputed masks
-        X_cols: list[np.ndarray] = [(X_base * m) for m in masks]
-        X_cols.append(np.ones(n, dtype=float))  # global intercept baseline
-        for im in intercept_masks:
-            X_cols.append(im)
-        X_cols.append(pulse)
-        X_cols.append(step)
-        if exog is not None:
-            X_cols.append(exog)
-        X = np.column_stack(X_cols)
-        y_vec = y.to_numpy().astype(float)
+    for exog_lag, exog in exog_candidates:
+        for K in k_grid:
+            X_base = (s_lag * (1.0 - s_lag / K)).to_numpy().astype(float)
+            # Build design matrix from precomputed masks
+            X_cols: list[np.ndarray] = [(X_base * m) for m in masks]
+            X_cols.append(np.ones(n, dtype=float))  # global intercept baseline
+            for im in intercept_masks:
+                X_cols.append(im)
+            X_cols.append(pulse)
+            X_cols.append(step)
+            if exog is not None:
+                X_cols.append(exog)
+            X = np.column_stack(X_cols)
+            y_vec = y.to_numpy().astype(float)
 
-        # OLS with a tiny ridge for stability (helps when columns are nearly collinear)
-        lam = 1e-6
-        XtX = X.T @ X
-        Xty = X.T @ y_vec
-        try:
-            beta = np.linalg.solve(XtX + lam * np.eye(X.shape[1]), Xty)
-        except np.linalg.LinAlgError:
-            # very rare; fall back to lstsq
-            beta, _, _, _ = np.linalg.lstsq(X, y_vec, rcond=None)
+            # OLS with a tiny ridge for stability (helps when columns are nearly collinear)
+            lam = 1e-6
+            XtX = X.T @ X
+            Xty = X.T @ y_vec
+            try:
+                beta = np.linalg.solve(XtX + lam * np.eye(X.shape[1]), Xty)
+            except np.linalg.LinAlgError:
+                # very rare; fall back to lstsq
+                beta, _, _, _ = np.linalg.lstsq(X, y_vec, rcond=None)
 
-        # Unpack parameters
-        r_segments = [float(b) for b in beta[:num_segments]]
-        gamma_intercept = float(beta[num_segments])
-        offset_count = max(num_segments - 1, 0)
-        offsets: list[float] = [0.0]
-        if offset_count:
-            start_idx = num_segments + 1
-            offsets.extend(float(beta[start_idx + i]) for i in range(offset_count))
-        gamma_pulse_idx = num_segments + 1 + offset_count
-        gamma_pulse = float(beta[gamma_pulse_idx])
-        gamma_step = float(beta[gamma_pulse_idx + 1])
-        beta_offset = gamma_pulse_idx + 2
-        gamma_exog = float(beta[beta_offset]) if exog is not None and len(beta) > beta_offset else None
+            # Unpack parameters
+            r_segments = [float(b) for b in beta[:num_segments]]
+            gamma_intercept = float(beta[num_segments])
+            offset_count = max(num_segments - 1, 0)
+            offsets: list[float] = [0.0]
+            if offset_count:
+                start_idx = num_segments + 1
+                offsets.extend(float(beta[start_idx + i]) for i in range(offset_count))
+            gamma_pulse_idx = num_segments + 1 + offset_count
+            gamma_pulse = float(beta[gamma_pulse_idx])
+            gamma_step = float(beta[gamma_pulse_idx + 1])
+            beta_offset = gamma_pulse_idx + 2
+            gamma_exog = (
+                float(beta[beta_offset])
+                if exog is not None and len(beta) > beta_offset
+                else None
+            )
 
-        segment_intercepts = [gamma_intercept + offsets[i] for i in range(num_segments)] if num_segments else []
+            segment_intercepts = [gamma_intercept + offsets[i] for i in range(num_segments)] if num_segments else []
 
-        # Reconstruct fitted series by integrating predicted deltas from the linear model
-        y_hat = X @ beta
-        s_hat = np.empty(n + 1, dtype=float)
-        s_hat[0] = float(input_series.iloc[0])
-        for t in range(n):
-            s_hat[t + 1] = max(s_hat[t] + y_hat[t], 0.0)
-        fitted = pd.Series(s_hat, index=input_series.index)
-        # Residuals on deltas (aligned to y index)
-        resid = y - pd.Series(y_hat, index=y.index)
-        sse = float(np.square(resid.to_numpy()).sum())
-        tss = float(np.square(y.to_numpy() - float(y.mean())).sum())
-        r2 = 1.0 - (sse / tss if tss > 0 else np.nan)
+            # Reconstruct fitted series by integrating predicted deltas from the linear model
+            y_hat = X @ beta
+            s_hat = np.empty(n + 1, dtype=float)
+            s_hat[0] = float(input_series.iloc[0])
+            for t in range(n):
+                s_hat[t + 1] = max(s_hat[t] + y_hat[t], 0.0)
+            fitted = pd.Series(s_hat, index=input_series.index)
+            # Residuals on deltas (aligned to y index)
+            resid = y - pd.Series(y_hat, index=y.index)
+            sse = float(np.square(resid.to_numpy()).sum())
+            tss = float(np.square(y.to_numpy() - float(y.mean())).sum())
+            r2 = 1.0 - (sse / tss if tss > 0 else np.nan)
 
-        fit = PiecewiseLogisticFit(
-            carrying_capacity=float(K),
-            segment_growth_rates=r_segments,
-            segment_intercepts=segment_intercepts,
-            breakpoints=bps,
-            gamma_pulse=gamma_pulse,
-            gamma_step=gamma_step,
-            fitted_series=fitted,
-            residuals=resid,
-            sse=sse,
-            r2_on_deltas=float(r2),
-            gamma_exog=gamma_exog,
-            gamma_intercept=gamma_intercept,
-        )
+            fit = PiecewiseLogisticFit(
+                carrying_capacity=float(K),
+                segment_growth_rates=r_segments,
+                segment_intercepts=segment_intercepts,
+                breakpoints=bps,
+                gamma_pulse=gamma_pulse,
+                gamma_step=gamma_step,
+                fitted_series=fitted,
+                residuals=resid,
+                sse=sse,
+                r2_on_deltas=float(r2),
+                gamma_exog=gamma_exog,
+                gamma_intercept=gamma_intercept,
+                exog_lag=exog_lag,
+            )
 
-        if sse < best_sse:
-            best_sse = sse
-            best = fit
+            if sse < best_sse:
+                best_sse = sse
+                best = fit
+                best_exog_lag = exog_lag
 
     if best is None:
         raise RuntimeError("Could not fit piecewise logistic model")
+
+    # Ensure the reported best fit carries the winning lag when exogenous search succeeded
+    if best_exog_lag is not None and getattr(best, "exog_lag", None) != best_exog_lag:
+        best = PiecewiseLogisticFit(
+            carrying_capacity=best.carrying_capacity,
+            segment_growth_rates=best.segment_growth_rates,
+            segment_intercepts=best.segment_intercepts,
+            breakpoints=best.breakpoints,
+            gamma_pulse=best.gamma_pulse,
+            gamma_step=best.gamma_step,
+            fitted_series=best.fitted_series,
+            residuals=best.residuals,
+            sse=best.sse,
+            r2_on_deltas=best.r2_on_deltas,
+            gamma_exog=best.gamma_exog,
+            gamma_intercept=best.gamma_intercept,
+            exog_lag=best_exog_lag,
+        )
+
     return best
 
 
@@ -261,6 +308,7 @@ def fitted_series_from_params(
     segment_growth_rates: Sequence[float],
     events_df: pd.DataFrame | None = None,
     extra_exog: pd.Series | None = None,
+    extra_exog_lag: int | None = None,
     gamma_pulse: float = 0.0,
     gamma_step: float = 0.0,
     gamma_exog: float | None = None,
@@ -283,7 +331,8 @@ def fitted_series_from_params(
     exog = None
     if extra_exog is not None:
         try:
-            exog = extra_exog.reindex(y_index).astype(float).to_numpy()
+            series_to_align = extra_exog.shift(int(extra_exog_lag)) if extra_exog_lag else extra_exog
+            exog = series_to_align.reindex(y_index).astype(float).to_numpy()
             exog = np.where(np.isfinite(exog), exog, 0.0)
         except Exception:
             exog = None

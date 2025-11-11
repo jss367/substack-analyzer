@@ -182,6 +182,7 @@ def run(
         # Unused here: breakpoints and gamma_pulse/step (kept for compatibility)
         gamma_exog = fit_params.get("gamma_exog")
         gamma_intercept = float(fit_params.get("gamma_intercept", 0.0))
+        exog_lag = int(fit_params.get("exog_lag")) if fit_params.get("exog_lag") is not None else 0
 
         # Determine starting S0 and last adstock
         S0 = float(est.get("start_free", 0) + est.get("start_premium", 0))
@@ -225,7 +226,9 @@ def run(
             r_t = r_last
             delta = float(gamma_intercept) + r_t * x_base
             if gamma_exog is not None:
-                delta += float(gamma_exog) * float(x_log[t - 1] if (t - 1) < len(x_log) else 0.0)
+                lag_idx = t - 1 - max(exog_lag, 0)
+                if lag_idx >= 0 and lag_idx < len(x_log):
+                    delta += float(gamma_exog) * float(x_log[lag_idx])
             S.append(max(S_prev + delta, 0.0))
 
         # Write forecast

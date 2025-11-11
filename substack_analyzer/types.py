@@ -22,6 +22,7 @@ class PiecewiseLogisticFit:
     r2_on_deltas: float
     gamma_exog: float | None = None
     gamma_intercept: float = 0.0
+    exog_lag: int | None = None
 
 
 @dataclass(frozen=True)
