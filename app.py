@@ -51,7 +51,6 @@ st.set_page_config(
 # Streamlit logger (appears in deployment logs)
 logger = get_logger(__name__)
 logger.info("App startup: version=%s", __version__)
-logger.info("App startup: Streamlit logger initialized (hello from logger)")
 
 
 # --- Events table: single source of truth ---
