@@ -5,8 +5,8 @@ from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.scenarios import (
     mid_sized_seasonal_conference_series,
     niche_steady_series,
+    scenario_ads_really_valuable,
     small_breakout_series,
-    test_phase1_ads_really_valuable_phase1_json,
     top_tier_sustained_marketing_series,
 )
 from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes
@@ -64,7 +64,7 @@ def test_mid_sized_seasonal_conference_series_fit():
 
 def test_phase1_ads_really_valuable_fit_with_exog():
     # Series synthesized with a strong exogenous ad-effect signal
-    series = test_phase1_ads_really_valuable_phase1_json()
+    series = scenario_ads_really_valuable()
 
     # Rebuild the same exogenous feature used in the scenario
     idx = series.index

@@ -23,10 +23,10 @@ from substack_analyzer.scenarios import (
     mid_sized_seasonal_conference_series,
     niche_steady_series,
     one_time_spike_series_and_events,
+    scenario_ads_extremely_valuable,
+    scenario_ads_no_effect,
+    scenario_ads_really_valuable,
     small_breakout_series,
-    test_phase1_ads_extremely_valuable_phase1_json,
-    test_phase1_ads_have_no_effect_phase1_json,
-    test_phase1_ads_really_valuable_phase1_json,
     top_tier_sustained_marketing_series,
 )
 from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes, synthesize_series_with_exog
@@ -94,7 +94,7 @@ def _build_phase1_ads_spiky_subplot(ax: plt.Axes) -> None:
 
 def _build_phase1_ads_valuable_subplot(ax: plt.Axes) -> None:
     # Scenario with constant monthly ad spend whose effect is modeled via exogenous features
-    series = test_phase1_ads_really_valuable_phase1_json()
+    series = scenario_ads_really_valuable()
     idx = series.index
     plot_df = pd.DataFrame(index=idx)
     spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
@@ -109,7 +109,7 @@ def _build_phase1_ads_valuable_subplot(ax: plt.Axes) -> None:
 
 def _build_phase1_ads_no_effect_subplot(ax: plt.Axes) -> None:
     # Scenario with ad spend present but total ignores exogenous effect
-    series = test_phase1_ads_have_no_effect_phase1_json()
+    series = scenario_ads_no_effect()
     idx = series.index
     plot_df = pd.DataFrame(index=idx)
     spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
@@ -124,7 +124,7 @@ def _build_phase1_ads_no_effect_subplot(ax: plt.Axes) -> None:
 
 def _build_phase1_ads_extremely_valuable_subplot(ax: plt.Axes) -> None:
     # Scenario with negligible organic growth but massive ad-driven growth
-    series = test_phase1_ads_extremely_valuable_phase1_json()
+    series = scenario_ads_extremely_valuable()
     idx = series.index
     plot_df = pd.DataFrame(index=idx)
     spikes = {idx[6]: 3000.0, idx[18]: 2000.0}

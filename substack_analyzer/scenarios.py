@@ -146,15 +146,15 @@ def top_tier_sustained_marketing_series() -> pd.Series:
         32500,
         34500,
         36600,
-        38800,
+        35000,
         41100,
         43500,
-        46000,
+        44000,
         48600,
         51300,
         54100,
         57000,
-        60000,
+        62000,
         63100,
         66300,
         69600,
@@ -162,21 +162,21 @@ def top_tier_sustained_marketing_series() -> pd.Series:
         76500,
         80100,
         83800,
-        87600,
+        87100,
         91500,
         95500,
         99600,
         103800,
         108100,
-        112500,
+        112900,
         117000,
         121600,
         126300,
         131100,
         136000,
-        141000,
-        146100,
-        151300,
+        142000,
+        145100,
+        149000,
     ]
     return pd.Series(vals, index=idx)
 
@@ -291,23 +291,23 @@ def mid_sized_seasonal_conference_series() -> pd.Series:
         3170,
         3290,
         3420,
-        3560,
+        3760,
         3710,
         3870,
         4040,
         4220,
         4410,
-        4610,
-        4820,
+        4710,
+        4920,
         5040,
         5270,
-        5510,
+        5310,
         5760,
         6020,
         6290,
-        6570,
-        6860,
-        7160,
+        6270,
+        7360,
+        7560,
         7470,
     ]
     return pd.Series(vals, index=idx)
@@ -458,7 +458,7 @@ def two_segment_ordered_series() -> tuple[pd.Series, list[int]]:
     return s, [5]
 
 
-def test_phase1_ads_really_valuable_phase1_json():
+def scenario_ads_really_valuable():
     # Monthly timeline
     idx = pd.period_range("2022-01", periods=36, freq="M").to_timestamp("M")
     plot_df = pd.DataFrame(index=idx)
@@ -478,7 +478,7 @@ def test_phase1_ads_really_valuable_phase1_json():
     return total
 
 
-def test_phase1_ads_extremely_valuable_phase1_json():
+def scenario_ads_extremely_valuable():
     """
     Scenario: almost no organic growth without ads, but enormous growth driven by ads.
 
@@ -507,7 +507,7 @@ def test_phase1_ads_extremely_valuable_phase1_json():
     return total
 
 
-def test_phase1_ads_have_no_effect_phase1_json():
+def scenario_ads_no_effect():
     # Monthly timeline
     idx = pd.period_range("2022-01", periods=36, freq="M").to_timestamp("M")
     plot_df = pd.DataFrame(index=idx)
