@@ -62,6 +62,107 @@ def read_series(file_like, has_header: bool, date_sel, count_sel) -> pd.Series:
     return s
 
 
+def _parse_fb_date_series(values: pd.Series) -> pd.Series:
+    """
+    Parse dates from Facebook-style exports where a date column might be a single
+    day (e.g., reporting end) or a range like 'YYYY-MM-DD - YYYY-MM-DD'.
+    Falls back to pandas' generic parser on failure.
+    """
+    v = values.astype(str)
+    with suppress(Exception):
+        right = v.str.split(" - ").str[-1]
+        dt = pd.to_datetime(right, errors="coerce")
+        if dt.notna().any():
+            return dt
+    return pd.to_datetime(v, errors="coerce")
+
+
+def _infer_ad_spend_date_spend(ad_df: pd.DataFrame) -> pd.DataFrame | None:
+    """
+    Return a DataFrame with columns {'date','spend'} inferred from common schemas.
+    Supports:
+      - Already normalized files with 'date' and 'spend'
+      - Facebook Ads Manager exports with columns like:
+        - 'Amount spent (USD)' for spend
+        - 'Reporting ends' (preferred), 'Reporting end', 'End date', 'Month', or 'Date' for date
+    Returns None if no valid mapping can be inferred.
+    """
+    if {"date", "spend"}.issubset(ad_df.columns):
+        df = ad_df[["date", "spend"]].copy()
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df["spend"] = pd.to_numeric(df["spend"], errors="coerce")
+        return df.dropna(subset=["date", "spend"])
+
+    cols_lower = {c.lower(): c for c in ad_df.columns}
+    # Guess spend column
+    spend_col_guess: str | None = None
+    for lc, orig in cols_lower.items():
+        if lc == "spend":
+            spend_col_guess = orig
+            break
+        if ("amount" in lc) and (("spent" in lc) or ("spend" in lc)):
+            spend_col_guess = orig
+            break
+    # Guess date column (prefer reporting ends, then fallbacks)
+    date_col_guess: str | None = None
+    for key in ["reporting ends", "reporting end", "end date", "month", "date"]:
+        if key in cols_lower:
+            date_col_guess = cols_lower[key]
+            break
+
+    if spend_col_guess is None or date_col_guess is None:
+        return None
+
+    df2 = (
+        ad_df[[date_col_guess, spend_col_guess]]
+        .rename(columns={date_col_guess: "date", spend_col_guess: "spend"})
+        .copy()
+    )
+    with suppress(Exception):
+        df2["date"] = _parse_fb_date_series(df2["date"])
+    df2["spend"] = pd.to_numeric(df2["spend"], errors="coerce")
+    return df2.dropna(subset=["date", "spend"])
+
+
+def _read_any_tabular(ad_file: str | Path | IO[str] | IO[bytes]) -> pd.DataFrame:
+    """
+    Read CSV/XLSX from a path or file-like object with robust fallbacks.
+    Prefers Excel if the suffix indicates; otherwise tries CSV first then Excel.
+    """
+    # Path-like
+    if isinstance(ad_file, (str, Path)):
+        suffix = (Path(ad_file).suffix or "").lower()
+        if suffix in {".xlsx", ".xls"}:
+            return pd.read_excel(ad_file)
+        return pd.read_csv(ad_file)
+
+    # File-like
+    name = getattr(ad_file, "name", "")
+    if isinstance(name, str) and name.lower().endswith((".xlsx", ".xls")):
+        return pd.read_excel(ad_file)
+    with suppress(Exception):
+        ad_file.seek(0)
+    try:
+        return pd.read_csv(ad_file)
+    except Exception:
+        with suppress(Exception):
+            ad_file.seek(0)
+        return pd.read_excel(ad_file)
+
+
+def _to_monthly_spend(df: pd.DataFrame, monthly_index: pd.DatetimeIndex) -> pd.Series:
+    """
+    Convert a normalized {'date','spend'} DataFrame to a monthly Series aligned
+    to `monthly_index` by collapsing to month-end and summing.
+    """
+    df2 = df.copy()
+    df2["date"] = pd.to_datetime(df2["date"], errors="coerce")
+    df2 = df2.dropna(subset=["date"])
+    df2["date"] = df2["date"].dt.to_period("M").dt.to_timestamp("M")
+    monthly = df2.groupby("date", as_index=True)["spend"].sum().sort_index()
+    return monthly.reindex(monthly_index).fillna(0.0)
+
+
 def plot_series(plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, series_title: str) -> alt.Chart:
     base = alt.Chart(plot_df.reset_index().rename(columns={"index": "date"})).encode(
         x=alt.X(
@@ -292,33 +393,10 @@ def build_events_features(
     ad_spend = pd.Series(0.0, index=monthly_index, name="ad_spend")
     if ad_file is not None:
         try:
-            # Accept path-like strings or file-like objects
-            if isinstance(ad_file, (str, Path)):
-                suffix = (Path(ad_file).suffix or "").lower()
-                if suffix in {".xlsx", ".xls"}:
-                    ad_df = pd.read_excel(ad_file)
-                else:
-                    ad_df = pd.read_csv(ad_file)
-            else:
-                # File-like: use extension hint if available; otherwise try CSV then Excel
-                name = getattr(ad_file, "name", "")
-                if isinstance(name, str) and name.lower().endswith((".xlsx", ".xls")):
-                    ad_df = pd.read_excel(ad_file)
-                else:
-                    with suppress(Exception):
-                        ad_file.seek(0)
-                    try:
-                        ad_df = pd.read_csv(ad_file)
-                    except Exception:
-                        with suppress(Exception):
-                            ad_file.seek(0)
-                        ad_df = pd.read_excel(ad_file)
-            if {"date", "spend"}.issubset(ad_df.columns):
-                ad_df = ad_df.assign(date=lambda d: pd.to_datetime(d["date"]))
-                ad_df = ad_df.dropna(subset=["date"])
-                ad_df["date"] = ad_df["date"].dt.to_period("M").dt.to_timestamp("M")
-                ad_df = ad_df.groupby("date", as_index=True)["spend"].sum().sort_index()
-                ad_spend = ad_df.reindex(monthly_index).fillna(0.0)
+            ad_df = _read_any_tabular(ad_file)
+            normalized = _infer_ad_spend_date_spend(ad_df)
+            if normalized is not None and not normalized.empty:
+                ad_spend = _to_monthly_spend(normalized, monthly_index)
         except Exception as e:
             st.error(
                 "Failed to read Ad Spend file. Ensure it has columns 'date' (YYYY-MM-DD) and 'spend'.\n" f"Details: {e}"
