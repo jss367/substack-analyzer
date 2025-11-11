@@ -21,7 +21,14 @@ from substack_analyzer.analysis import (
     read_series,
 )
 from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_from_params, forecast_piecewise_logistic
-from substack_analyzer.changepoints import breakpoints_to_events, detect_and_classify
+from substack_analyzer.changepoints import (
+    BreakpointEffect,
+    DetectionConfig,
+    DetectionResult,
+    breakpoints_to_events,
+    filter_breakpoints,
+    run_detection,
+)
 from substack_analyzer.detection import compute_segment_slopes, slope_around
 from substack_analyzer.model import simulate_growth
 from substack_analyzer.persistence import (
@@ -452,8 +459,10 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                 else:
                     max_changes = int(st.session_state.get("max_changes_detect", 3))
 
-                    def _detect(series: pd.Series) -> list:
-                        return detect_and_classify(series.dropna(), max_changes=max_changes, window=6)
+                    detect_cfg = DetectionConfig(use_classifier=True, max_changes=max_changes, window=6)
+
+                    def _detect(series: pd.Series) -> DetectionResult:
+                        return run_detection(series, config=detect_cfg)
 
                     # Debug: record detection configuration
                     try:
@@ -486,48 +495,49 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             pass
 
                     # Determine which series to run on
-                    classified_list: list = []
+                    detections: list[DetectionResult] = []
                     label_list: list[str] = []
                     # Auto
                     if detect_mode.startswith("Auto"):
                         s_auto = plot_df[target_col].dropna()
-                        classified_list = [_detect(s_auto)]
+                        detections = [_detect(s_auto)]
                         label_list = [target_col]
-                        _log_classified(label_list[0], classified_list[0])
+                        _log_classified(label_list[0], detections[0].classified)
                     # Explicit targets
                     elif detect_mode == "Total" and ("Total" in plot_df.columns):
-                        classified_list = [_detect(plot_df["Total"])]
+                        detections = [_detect(plot_df["Total"])]
                         label_list = ["Total"]
                         target_col = "Total"
-                        _log_classified("Total", classified_list[0])
+                        _log_classified("Total", detections[0].classified)
                     elif detect_mode == "Free" and ("Free" in plot_df.columns):
-                        classified_list = [_detect(plot_df["Free"])]
+                        detections = [_detect(plot_df["Free"])]
                         label_list = ["Free"]
                         target_col = "Free"
-                        _log_classified("Free", classified_list[0])
+                        _log_classified("Free", detections[0].classified)
                     elif detect_mode == "Paid" and ("Paid" in plot_df.columns):
-                        classified_list = [_detect(plot_df["Paid"])]
+                        detections = [_detect(plot_df["Paid"])]
                         label_list = ["Paid"]
                         target_col = "Paid"
-                        _log_classified("Paid", classified_list[0])
+                        _log_classified("Paid", detections[0].classified)
                     elif detect_mode.startswith("Both") and ({"Total", "Paid"}.issubset(plot_df.columns)):
-                        classified_list = [_detect(plot_df["Total"]), _detect(plot_df["Paid"])]
+                        detections = [_detect(plot_df["Total"]), _detect(plot_df["Paid"])]
                         label_list = ["Total", "Paid"]
-                        _log_classified("Total", classified_list[0])
-                        _log_classified("Paid", classified_list[1])
+                        _log_classified("Total", detections[0].classified)
+                        _log_classified("Paid", detections[1].classified)
                     else:
                         st.info("Requested detection target not available in current data.")
-                        classified_list = []
+                        detections = []
 
                     # Merge results
                     merged_events_df = None
-                    merged_classified = []
+                    merged_classified: list[BreakpointEffect] = []
 
-                    if not classified_list or all(len(c) == 0 for c in classified_list):
+                    if not detections or all(len(res.classified) == 0 for res in detections):
                         st.info("No change dates detected with current settings.")
                     else:
                         # Seed events per source label
-                        for cls, label in zip(classified_list, label_list):
+                        for result, label in zip(detections, label_list):
+                            cls = result.classified
                             if not cls:
                                 continue
                             seeded_df = breakpoints_to_events(cls, target_label=label)
@@ -584,11 +594,11 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                                         merged.append(d)
                             return merged
 
-                        seg_effects = [
-                            b
-                            for b in merged_classified
-                            if (b.effect == "Persistent" and b.component in {"rate", "mixed"})
-                        ]
+                        seg_effects = filter_breakpoints(
+                            merged_classified,
+                            effects=["Persistent"],
+                            components=["rate", "mixed"],
+                        )
                         try:
                             logger.info(
                                 "Classifier filtered (Persistent & rate/mixed): %s",
