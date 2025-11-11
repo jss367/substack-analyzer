@@ -21,7 +21,7 @@ def test_top_tier_sustained_marketing_series_fit():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 4
     assert fit.r2_on_deltas > 0.6
-    assert fit.sse <= 60000000
+    assert fit.sse <= 52_000_000
 
 
 def test_small_breakout_series_fit():
@@ -34,7 +34,7 @@ def test_small_breakout_series_fit():
     # Later growth should generally be higher than early growth
     assert fit.segment_growth_rates[-1] > fit.segment_growth_rates[0]
     assert fit.r2_on_deltas > 0.8
-    assert fit.sse <= 30000
+    assert fit.sse <= 20_000
 
 
 def test_niche_steady_series_fit():
@@ -49,7 +49,7 @@ def test_niche_steady_series_fit():
     )  # for now it can be a little negative because gamma_intercept explains the positive growth. I think this is fine.
 
     assert fit.r2_on_deltas > 0.02  # This metric doesn't really matter
-    assert fit.sse <= 10000
+    assert fit.sse <= 4_000
 
 
 def test_mid_sized_seasonal_conference_series_fit():
@@ -60,7 +60,7 @@ def test_mid_sized_seasonal_conference_series_fit():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 3
     assert fit.r2_on_deltas > 0.2
-    assert fit.sse <= 900000
+    assert fit.sse <= 890_000
 
 
 def test_phase1_ads_really_valuable_fit_with_exog():
