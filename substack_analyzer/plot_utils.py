@@ -2,12 +2,17 @@
 A simple plotting tool for visualizing series and fits.
 """
 
+import logging
+
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
 from substack_analyzer.types import PiecewiseLogisticFit
 from substack_analyzer.utils import ensure_month_end_index
+
+
+logger = logging.getLogger(__name__)
 
 
 def plot_fit_vs_actual(
@@ -60,8 +65,29 @@ def plot_fit_vs_actual(
     if show_breakpoints and getattr(fit, "breakpoints", None):
         idx = actual.index
         for b in fit.breakpoints:
-            if isinstance(b, int) and 0 <= b < len(idx):
-                ax.axvline(idx[b], color="#DB4437", linestyle="--", linewidth=1.2)
+            if not isinstance(b, int):
+                logger.debug("Skipping breakpoint %r: non-integer index", b)
+                continue
+
+            if b <= 0:
+                boundary_index = 0
+            elif b < len(idx):
+                boundary_index = b - 1
+            else:
+                logger.debug(
+                    "Skipping breakpoint %r: exceeds index range (len=%d)",
+                    b,
+                    len(idx),
+                )
+                continue
+
+            logger.debug(
+                "Plotting breakpoint %r at index %r (timestamp=%s)",
+                b,
+                boundary_index,
+                idx[boundary_index],
+            )
+            ax.axvline(idx[boundary_index], color="#DB4437", linestyle="--", linewidth=1.2)
 
     ax.set_title(title)
     ax.set_ylabel("Subscribers")
