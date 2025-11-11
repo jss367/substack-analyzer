@@ -10,6 +10,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit.logger import get_logger
 
+from substack_analyzer import __version__
 from substack_analyzer.analysis import (
     DEFAULT_AD_LOG_THETA,
     DEFAULT_ADSTOCK_LAMBDA,
@@ -49,6 +50,7 @@ st.set_page_config(
 
 # Streamlit logger (appears in deployment logs)
 logger = get_logger(__name__)
+logger.info("App startup: version=%s", __version__)
 logger.info("App startup: Streamlit logger initialized (hello from logger)")
 
 
@@ -1754,8 +1756,7 @@ def _parse_and_normalize_series(
 
 
 def _ui_series_chart(plot_df: pd.DataFrame) -> tuple[bool, bool]:
-    logger.info("_ui_series_chart has been called")
-    logger.info(f"plot_df: {plot_df}")
+
     if plot_df.empty:
         return False, False
     use_dual_axis = st.checkbox(
