@@ -425,7 +425,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
     # Detection mode selector
     detect_mode = st.selectbox(
         "Detection target",
-        ["Auto (Total→Free)", "Total", "Free", "Paid", "Both (Total+Paid)"],
+        ["Both (Total+Paid)", "Auto (Total→Free)", "Total", "Free", "Paid"],
         index=0,
         help=(
             "Choose which series to run change-point detection on. "
