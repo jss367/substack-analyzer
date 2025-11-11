@@ -473,7 +473,9 @@ def scenario_ads_really_valuable():
     exog = features_df["ad_effect_log"].astype(float)
 
     # Build Total series that actually uses exogenous effect (positive influence)
-    total = synthesize_series_with_exog(idx, K=20000.0, r=0.03, exog=exog, g_exog=0)
+    # Lower the organic growth rate a bit so the ad contribution is a meaningful share
+    # of the month-to-month deltas (g_exog ~= 5 subscribers per unit of ad_effect_log).
+    total = synthesize_series_with_exog(idx, K=20000.0, r=0.02, exog=exog, g_exog=5.0)
 
     return total
 
