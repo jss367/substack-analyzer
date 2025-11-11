@@ -119,7 +119,7 @@ def test_phase1_ads_extremely_valuable_fit_with_exog():
     assert fit.exog_lag == 1
     # The exogenous signal should almost perfectly explain monthly changes
     assert fit.r2_on_deltas > 0.9
-    assert fit.sse <= 4000000
+    assert fit.sse <= 3_850_000
 
 
 def test_top_tier_sustained_marketing_series_fit():
@@ -130,7 +130,7 @@ def test_top_tier_sustained_marketing_series_fit():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 4
     assert fit.r2_on_deltas > 0.55
-    assert fit.sse <= 60000000
+    assert fit.sse <= 52_000_000
 
 
 def test_small_breakout_series_fit():
@@ -143,7 +143,7 @@ def test_small_breakout_series_fit():
     # Later growth should generally be higher than early growth
     assert fit.segment_growth_rates[-1] > fit.segment_growth_rates[0]
     assert fit.r2_on_deltas > 0.8
-    assert fit.sse <= 50000
+    assert fit.sse <= 25_000
 
 
 def test_niche_steady_series_fit():
@@ -155,7 +155,7 @@ def test_niche_steady_series_fit():
     assert len(fit.segment_growth_rates) == 1
     assert fit.segment_growth_rates[0] > -0.1
     assert fit.r2_on_deltas > 0.02
-    assert fit.sse <= 10000
+    assert fit.sse <= 4_000
 
 
 def test_mid_sized_seasonal_conference_series_fit():
@@ -166,4 +166,4 @@ def test_mid_sized_seasonal_conference_series_fit():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 3
     assert fit.r2_on_deltas > 0.25
-    assert fit.sse <= 900000
+    assert fit.sse <= 890_000
