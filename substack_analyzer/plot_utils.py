@@ -66,10 +66,7 @@ def plot_fit_vs_actual(
             if b <= 0:
                 x = idx[0]
             elif b < len(idx):
-                prev_point = idx[b - 1]
-                next_point = idx[b]
-                midpoint = prev_point + (next_point - prev_point) / 2
-                x = midpoint
+                x = idx[b - 1]
             else:
                 continue
 
