@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Phase 1: Substack Analyzer (headless)",
+            "name": "Phase 1: CY",
             "type": "debugpy",
             "request": "launch",
             "program": "/Users/julius/git/substack-analyzer/scripts/run_headless.py",
