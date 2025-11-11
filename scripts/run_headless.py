@@ -37,7 +37,7 @@ from substack_analyzer.analysis import (
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.detection import detect_change_points
 from substack_analyzer.persistence import export_phase_one_json
-from substack_analyzer.utils import ensure_month_end_index
+from substack_analyzer.utils import coerce_list, ensure_month_end_index
 
 coloredlogs.install(level="DEBUG")
 logger = logging.getLogger("substack_headless")
@@ -382,7 +382,7 @@ def run(
             eq = eq[:-1] + r" + \\gamma_{exog}\\,x_t$"
 
         k_now = getattr(fit, "carrying_capacity", None)
-        r_list = list(getattr(fit, "segment_growth_rates", []) or [])
+        r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
         gp = getattr(fit, "gamma_pulse", None)
         gs = getattr(fit, "gamma_step", None)
         gx = getattr(fit, "gamma_exog", None)
