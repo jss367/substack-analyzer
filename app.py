@@ -31,6 +31,7 @@ from substack_analyzer.persistence import (
     export_phase_one_json,
 )
 from substack_analyzer.types import AdSpendSchedule, SimulationInputs
+from substack_analyzer.utils import coerce_list
 from substack_analyzer.ui import format_currency as ui_format_currency
 from substack_analyzer.ui import format_date_badges as ui_format_date_badges
 from substack_analyzer.ui import inject_brand_styles as ui_inject_brand_styles
@@ -861,19 +862,25 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if getattr(fit, "gamma_exog", None) is not None and "modelfit_gamma_exog" not in st.session_state:
                 st.session_state["modelfit_gamma_exog"] = float(getattr(fit, "gamma_exog", 0.0))
             if "modelfit_r" not in st.session_state:
-                st.session_state["modelfit_r"] = list(getattr(fit, "segment_growth_rates", []) or [])
+                st.session_state["modelfit_r"] = coerce_list(getattr(fit, "segment_growth_rates", None))
             if "modelfit_intercepts" not in st.session_state:
-                st.session_state["modelfit_intercepts"] = list(getattr(fit, "segment_intercepts", []) or [])
+                st.session_state["modelfit_intercepts"] = coerce_list(getattr(fit, "segment_intercepts", None))
 
             # ----- read current overrides & recompute fitted line with them -----
             def _current_fit_params():
                 fit_obj = st.session_state.get("pwlog_fit")
                 k_val = float(st.session_state.get("modelfit_K", getattr(fit_obj, "carrying_capacity", 0.0) or 0.0))
-                r_list = list(
-                    st.session_state.get("modelfit_r", list(getattr(fit_obj, "segment_growth_rates", []) or []))
+                r_list = coerce_list(
+                    st.session_state.get(
+                        "modelfit_r",
+                        coerce_list(getattr(fit_obj, "segment_growth_rates", None)),
+                    )
                 )
-                intercepts = list(
-                    st.session_state.get("modelfit_intercepts", list(getattr(fit_obj, "segment_intercepts", []) or []))
+                intercepts = coerce_list(
+                    st.session_state.get(
+                        "modelfit_intercepts",
+                        coerce_list(getattr(fit_obj, "segment_intercepts", None)),
+                    )
                 )
                 gp_val = float(
                     st.session_state.get("modelfit_gamma_pulse", getattr(fit_obj, "gamma_pulse", 0.0) or 0.0)
@@ -988,7 +995,12 @@ def _current_fit_params():
     """
     fit_obj = st.session_state.get("pwlog_fit")
     k_val = float(st.session_state.get("modelfit_K", getattr(fit_obj, "carrying_capacity", 0.0) or 0.0))
-    r_list = list(st.session_state.get("modelfit_r", list(getattr(fit_obj, "segment_growth_rates", []) or [])))
+    r_list = coerce_list(
+        st.session_state.get(
+            "modelfit_r",
+            coerce_list(getattr(fit_obj, "segment_growth_rates", None)),
+        )
+    )
     gp_val = float(st.session_state.get("modelfit_gamma_pulse", getattr(fit_obj, "gamma_pulse", 0.0) or 0.0))
     gs_val = float(st.session_state.get("modelfit_gamma_step", getattr(fit_obj, "gamma_step", 0.0) or 0.0))
     gx_val = st.session_state.get("modelfit_gamma_exog", getattr(fit_obj, "gamma_exog", None))
@@ -1118,7 +1130,7 @@ def sidebar_inputs() -> SimulationInputs:
 
     # Brief status: show fitted segment growth rates if available
     fit_side = st.session_state.get("pwlog_fit")
-    seg_rates = list(getattr(fit_side, "segment_growth_rates", []) or [])
+    seg_rates = coerce_list(getattr(fit_side, "segment_growth_rates", None))
     if seg_rates:
         # Prefer live overrides if present
         r_over = st.session_state.get("modelfit_r")
@@ -1360,7 +1372,7 @@ def sidebar_inputs() -> SimulationInputs:
                     )
 
                 # Segment growth rates r_j
-                r_list = list(getattr(fit, "segment_growth_rates", []) or [])
+                r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
                 r_over = []
                 for j, rj in enumerate(r_list, start=1):
                     r_val = number_input_state(
