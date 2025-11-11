@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Literal, Optional
+from typing import Iterable, List, Literal, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,28 @@ class BreakpointEffect:
     rate_score: float  # |Δslope| relative to rate threshold
     level_score: float  # |Δlevel| relative to level threshold
     note: str | None = None
+
+
+@dataclass(frozen=True)
+class DetectionConfig:
+    """Shared configuration for change-point detection across app + headless runs."""
+
+    use_classifier: bool = True
+    max_changes: int = 4
+    min_seg_len: int = 2
+    penalty_scale: float = 4.0
+    window: int = 6
+    z_pulse: float = 3.0
+    rate_factor: float = 0.75
+    level_factor: float = 0.75
+
+
+@dataclass(frozen=True)
+class DetectionResult:
+    """Container for the outputs of ``run_detection``."""
+
+    indices: list[int]
+    classified: list[BreakpointEffect]
 
 
 def _mad(x: np.ndarray) -> float:
@@ -177,6 +199,68 @@ def breakpoints_for_segments(bps: List[BreakpointEffect]) -> List[int]:
         return False
 
     return sorted(set(b.index for b in bps if is_segment_worthy(b)))
+
+
+def filter_breakpoints(
+    bps: Sequence[BreakpointEffect],
+    *,
+    effects: Iterable[Effect] | None = None,
+    components: Iterable[Component] | None = None,
+) -> list[BreakpointEffect]:
+    """Return a filtered list of ``BreakpointEffect`` objects matching the criteria."""
+
+    eff_set = {e for e in (effects or [])}
+    comp_set = {c for c in (components or [])}
+
+    def _matches(b: BreakpointEffect) -> bool:
+        eff_ok = True if not eff_set else b.effect in eff_set
+        comp_ok = True if not comp_set else b.component in comp_set
+        return eff_ok and comp_ok
+
+    return [b for b in bps if _matches(b)]
+
+
+def run_detection(input_series: pd.Series, config: DetectionConfig | None = None) -> DetectionResult:
+    """Run change-point detection with shared configuration.
+
+    Parameters
+    ----------
+    input_series:
+        Series to analyse (will be ``dropna``/``sort_index`` cleaned).
+    config:
+        Optional :class:`DetectionConfig`. When omitted the defaults mirror the
+        interactive app (classifier-based detector with a six-month window).
+    """
+
+    cfg = config or DetectionConfig()
+    series = input_series.dropna().sort_index()
+    if series.empty:
+        return DetectionResult(indices=[], classified=[])
+
+    if cfg.use_classifier:
+        classified = detect_and_classify(
+            series,
+            max_changes=cfg.max_changes,
+            min_seg_len=cfg.min_seg_len,
+            penalty_scale=cfg.penalty_scale,
+            window=cfg.window,
+            z_pulse=cfg.z_pulse,
+            rate_factor=cfg.rate_factor,
+            level_factor=cfg.level_factor,
+        )
+        indices = sorted({int(b.index) for b in classified})
+        return DetectionResult(indices=indices, classified=classified)
+
+    indices = list(
+        detect_change_points(
+            series,
+            max_changes=cfg.max_changes,
+            min_seg_len=cfg.min_seg_len,
+            penalty_scale=cfg.penalty_scale,
+            return_mode="indices",
+        )
+    )
+    return DetectionResult(indices=sorted({int(i) for i in indices}), classified=[])
 
 
 def detect_and_classify(
