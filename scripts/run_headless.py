@@ -134,8 +134,8 @@ def run(
         events_path,
         adspend_path,
         detect_on,
-        float(lam),
-        float(theta),
+        lam,
+        theta,
         out_dir,
     )
 
