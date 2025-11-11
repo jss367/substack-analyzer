@@ -64,13 +64,16 @@ def plot_fit_vs_actual(
                 continue
 
             if b <= 0:
-                boundary_index = 0
+                x = idx[0]
             elif b < len(idx):
-                boundary_index = b - 1
+                prev_point = idx[b - 1]
+                next_point = idx[b]
+                midpoint = prev_point + (next_point - prev_point) / 2
+                x = midpoint
             else:
                 continue
 
-            ax.axvline(idx[boundary_index], color="#DB4437", linestyle="--", linewidth=1.2)
+            ax.axvline(x, color="#DB4437", linestyle="--", linewidth=1.2)
 
     ax.set_title(title)
     ax.set_ylabel("Subscribers")
