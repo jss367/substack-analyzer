@@ -1512,6 +1512,14 @@ def sidebar_inputs() -> SimulationInputs:
     # Model fit parameters (read from fit; allow manual override for what-if scenarios)
     with st.sidebar.expander("Model fit parameters", expanded=True):
         fit = st.session_state.get("pwlog_fit")
+        if fit is not None:
+            logger.info(
+                "Rendering model fit parameters: carrying_capacity=%s, gamma_pulse=%s, gamma_step=%s, gamma_exog=%s",
+                getattr(fit, "carrying_capacity", None),
+                getattr(fit, "gamma_pulse", None),
+                getattr(fit, "gamma_step", None),
+                getattr(fit, "gamma_exog", None),
+            )
         if fit is None:
             st.caption("No model fit available yet. Run Model fit on the Estimators tab or edit r below for simulations.")
         else:
@@ -1552,9 +1560,12 @@ def sidebar_inputs() -> SimulationInputs:
 
                 # Segment growth rates r_j
                 base_r_list = coerce_list(st.session_state.get("modelfit_r"))
+                logger.info("Initial base_r_list from session state: %s", base_r_list)
                 if not base_r_list:
                     base_r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
+                    logger.info("Fallback base_r_list from fit: %s", base_r_list)
             except Exception:
+                logger.exception("Model fit parameters available, but could not render editor. fit=%s", fit)
                 st.caption("Model fit parameters available, but could not render editor.")
                 base_r_list = []
         if fit is None:
