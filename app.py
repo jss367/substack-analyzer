@@ -1344,8 +1344,6 @@ def sidebar_inputs() -> SimulationInputs:
             )
             stage1 = float(stage1 or 0.0)
             stage2 = float(stage2 or 0.0)
-            st.session_state["ad_stage1"] = stage1
-            st.session_state["ad_stage2"] = stage2
             ad_schedule = AdSpendSchedule.two_stage(stage1, stage2)
             st.session_state["spend_mode_index"] = 0
         else:
@@ -1357,7 +1355,6 @@ def sidebar_inputs() -> SimulationInputs:
                 key="ad_const",
             )
             const_spend = float(const_spend or 0.0)
-            st.session_state["ad_const"] = const_spend
             ad_schedule = AdSpendSchedule.constant(const_spend)
             st.session_state["spend_mode_index"] = 1
 
