@@ -1019,7 +1019,11 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             # ----- metrics -----
             c1, c2, c3 = st.columns(3)
             c1.metric("K (capacity)", f"{int(K_now):,}")
-            c2.metric("Segments (r)", ", ".join(f"{r:0.3f}" for r in r_list_now))
+            last_r_metric = "—"
+            if r_list_now:
+                with suppress(Exception):
+                    last_r_metric = f"{float(r_list_now[-1]):0.3f}"
+            c2.metric("Last segment r", last_r_metric)
             c3.metric("R² on ΔS", f"{fit.r2_on_deltas:0.3f}")
             if getattr(fit, "gamma_exog", None) is not None:
                 st.caption(f"Exogenous effect: γ_exog={float(gx_now):0.4f}")
@@ -1036,9 +1040,11 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 st.latex(eq)
                 st.markdown("**Fitted parameters**")
                 st.markdown(f"- **K (capacity)**: {float(K_now):,.0f}")
-                st.markdown(
-                    "- **Segment growth rates r_j**: " + ", ".join(f"r{j+1}={r:0.3f}" for j, r in enumerate(r_list_now))
-                )
+                last_r_text = "—"
+                if r_list_now:
+                    with suppress(Exception):
+                        last_r_text = f"{float(r_list_now[-1]):0.3f}"
+                st.markdown(f"- **Last segment growth rate (r)**: {last_r_text}")
                 st.markdown(f"- **γ_pulse**: {gp_now:0.4f}")
                 st.markdown(f"- **γ_step**: {gs_now:0.4f}")
                 if gx_now is not None:
@@ -1240,8 +1246,10 @@ def sidebar_inputs() -> SimulationInputs:
     if not r_overrides and fit_side is not None:
         r_overrides = coerce_list(getattr(fit_side, "segment_growth_rates", None))
     if r_overrides:
-        r_list_str = ", ".join(f"r{j+1}={r:0.3f}" for j, r in enumerate(r_overrides))
-        st.sidebar.caption(f"Segments (r): {r_list_str}. Edit under Model fit parameters.")
+        last_r_caption = "—"
+        with suppress(Exception):
+            last_r_caption = f"{float(r_overrides[-1]):0.3f}"
+        st.sidebar.caption(f"Last segment r: {last_r_caption}. Edit under Model fit parameters.")
 
     with st.sidebar.expander("Starting point", expanded=True):
         start_free = number_input_state(
