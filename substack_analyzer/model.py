@@ -74,8 +74,17 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
         free_subs -= free_churned
         premium_subs -= premium_churned
 
+        # Capacity pressure: scale organic/paid acquisition as the audience
+        # approaches the inferred carrying capacity (if provided).
+        total_after_churn = free_subs + premium_subs
+        capacity_multiplier = 1.0
+        carrying_capacity = input_params.carrying_capacity or 0.0
+        if carrying_capacity > 0:
+            capacity_multiplier = max(0.0, 1.0 - total_after_churn / carrying_capacity)
+
         # Organic growth
-        new_free_organic = free_subs * input_params.organic_monthly_growth_rate
+        new_free_organic_raw = free_subs * input_params.organic_monthly_growth_rate
+        new_free_organic = new_free_organic_raw * capacity_multiplier
 
         # Paid acquisition
         ad_spend = float(input_params.ad_spend_schedule.get_spend_for_month(m))
@@ -84,9 +93,10 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
             if input_params.cost_per_new_free_subscriber <= 0
             else ad_spend / input_params.cost_per_new_free_subscriber
         )
+        new_free_paid = paid_new * capacity_multiplier
 
         # Add new free
-        new_free_total = new_free_organic + paid_new
+        new_free_total = new_free_organic + new_free_paid
         free_subs += new_free_total
 
         # Conversions to premium
@@ -126,7 +136,7 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
                 premium_subs,
                 total_subscribers,
                 new_free_organic,
-                paid_new,
+                new_free_paid,
                 free_churned,
                 convert_from_new,
                 convert_from_existing,

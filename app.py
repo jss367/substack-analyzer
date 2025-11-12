@@ -1416,11 +1416,19 @@ def sidebar_inputs() -> SimulationInputs:
 
     # Map model-fit overrides into simulator: use last segment r as organic growth if available
     _k_now, _r_now, _gp_now, _gs_now, _gx_now = _current_fit_params()
+    carrying_capacity = None
+    try:
+        k_float = float(_k_now)
+    except (TypeError, ValueError):
+        k_float = 0.0
+    if k_float > 0:
+        carrying_capacity = k_float
     organic_from_fit = float(_r_now[-1]) if (_r_now and len(_r_now) > 0) else float(organic_growth)
 
     return SimulationInputs(
         starting_free_subscribers=start_free,
         starting_premium_subscribers=start_premium,
+        carrying_capacity=carrying_capacity,
         horizon_months=horizon,
         organic_monthly_growth_rate=organic_from_fit,
         monthly_churn_rate_free=float(churn_free),
