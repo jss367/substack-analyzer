@@ -70,6 +70,10 @@ class SimulationInputs:
     starting_free_subscribers: int = 0
     starting_premium_subscribers: int = 0
 
+    # Optional carrying capacity (total subscribers) that damps growth as the
+    # audience approaches the inferred ceiling from Phase 1 fits.
+    carrying_capacity: float | None = None
+
     # Horizon
     horizon_months: int = 60
 

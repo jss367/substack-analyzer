@@ -72,6 +72,7 @@ def run(
     # Inputs from Phase 1
     est: dict = {}
     fit_params: dict | None = None
+    carrying_capacity: float | None = None
     if phase1_path:
         p1 = _read_phase1(Path(phase1_path))
         total_series = _records_to_series(p1.get("total_series"))
@@ -81,6 +82,13 @@ def run(
         fit_params = p1.get("fit_params") if isinstance(p1, dict) else None
         lam = float(p1.get("adstock_lambda", 0.5))
         theta = float(p1.get("ad_log_theta", 500.0))
+        if fit_params and "carrying_capacity" in fit_params:
+            try:
+                carrying_capacity_val = float(fit_params.get("carrying_capacity"))
+            except (TypeError, ValueError):
+                carrying_capacity_val = 0.0
+            if carrying_capacity_val > 0:
+                carrying_capacity = carrying_capacity_val
     else:
         # Locate summary.json
         if summary_path:
@@ -103,6 +111,7 @@ def run(
                 "gamma_exog": summary.get("gamma_exog"),
                 "gamma_intercept": float(summary.get("gamma_intercept", 0.0)),
             }
+            carrying_capacity = float(summary.get("carrying_capacity", 0.0)) or None
         lam = 0.5
         theta = 500.0
 
@@ -132,6 +141,7 @@ def run(
     inputs = SimulationInputs(
         starting_free_subscribers=start_free,
         starting_premium_subscribers=start_premium,
+        carrying_capacity=carrying_capacity,
         horizon_months=horizon,
         organic_monthly_growth_rate=organic_growth,
         monthly_churn_rate_free=churn_free,
@@ -177,7 +187,7 @@ def run(
 
     # Optional: Forecast total subscribers using fitted equation if fit params were provided
     if fit_params is not None:
-        K = float(fit_params.get("carrying_capacity", 0.0))
+        K = float(carrying_capacity or fit_params.get("carrying_capacity", 0.0))
         r_list = [float(x) for x in (fit_params.get("segment_growth_rates") or [])]
         # Unused here: breakpoints and gamma_pulse/step (kept for compatibility)
         gamma_exog = fit_params.get("gamma_exog")

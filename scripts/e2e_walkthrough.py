@@ -165,6 +165,7 @@ def main() -> None:
     sim_inputs = SimulationInputs(
         starting_free_subscribers=int(est.get("start_free", 1500)),
         starting_premium_subscribers=int(est.get("start_premium", 80)),
+        carrying_capacity=getattr(fit, "carrying_capacity", None),
         horizon_months=24,
         organic_monthly_growth_rate=float(est.get("organic_growth", 0.01)),
         ongoing_premium_conv_rate=0.0003,
