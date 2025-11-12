@@ -1351,6 +1351,10 @@ def sidebar_inputs() -> SimulationInputs:
                 step=50.0,
                 key="ad_stage2",
             )
+            stage1 = float(stage1 or 0.0)
+            stage2 = float(stage2 or 0.0)
+            st.session_state["ad_stage1"] = stage1
+            st.session_state["ad_stage2"] = stage2
             ad_schedule = AdSpendSchedule.two_stage(stage1, stage2)
             st.session_state["spend_mode_index"] = 0
         else:
@@ -1361,8 +1365,20 @@ def sidebar_inputs() -> SimulationInputs:
                 step=50.0,
                 key="ad_const",
             )
+            const_spend = float(const_spend or 0.0)
+            st.session_state["ad_const"] = const_spend
             ad_schedule = AdSpendSchedule.constant(const_spend)
             st.session_state["spend_mode_index"] = 1
+
+        with st.sidebar.expander("Ad spend preview", expanded=False):
+            horizon_idx = max(int(horizon) - 1, 0)
+            candidates = [0, 11, 23, 35, 59, horizon_idx]
+            preview_months = sorted({min(max(m, 0), horizon_idx) for m in candidates})
+            preview_rows = {
+                f"Month {m + 1}": format_currency(float(ad_schedule.get_spend_for_month(m)))
+                for m in preview_months
+            }
+            st.write("Representative monthly ad spend:", preview_rows)
 
         cac = number_input_state(
             "Cost per new free subscriber (CAC)",
