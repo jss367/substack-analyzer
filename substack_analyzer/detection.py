@@ -30,7 +30,7 @@ def compute_segment_slopes(series: pd.Series, breakpoints: list[int]) -> list[Se
     # breakpoints (including unsorted or out-of-bounds values), so we defensively
     # clamp them to the valid range and ensure they are strictly increasing.
     cleaned_breaks: list[int] = []
-    for bp in sorted(set(int(b) for b in breakpoints or [])):
+    for bp in sorted({int(b) for b in (breakpoints or [])}):
         if bp <= 0 or bp > n:
             continue
         if cleaned_breaks and bp <= cleaned_breaks[-1]:
@@ -185,10 +185,7 @@ def detect_change_points(
         Map a split at position k in x back to original series index i = k + d.
         """
         # Build differenced data
-        if d == 0:
-            x_ser = s
-        else:
-            x_ser = s.diff(d).dropna()
+        x_ser = s if d == 0 else s.diff(d).dropna()
         x = x_ser.to_numpy()
         m = len(x)
         # Need enough points to split: at least (2*min_seg_len + 1)
