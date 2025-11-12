@@ -120,11 +120,7 @@ def fit_piecewise_logistic(
     # Optional exogenous aligned to y index (support trying simple integer lags)
     exog_candidates: list[tuple[int | None, np.ndarray | None]] = [(None, None)]
     if extra_exog is not None:
-        candidate_lags = (
-            [int(l) for l in exog_lags]
-            if exog_lags is not None
-            else [0, 1]
-        )
+        candidate_lags = [int(l) for l in exog_lags] if exog_lags is not None else [0, 1]
         unique_lags = []
         for lag in candidate_lags:
             if lag not in unique_lags:
@@ -158,6 +154,7 @@ def fit_piecewise_logistic(
 
     best: PiecewiseLogisticFit | None = None
     best_sse = np.inf
+    best_score = np.inf
     best_exog_lag: int | None = None
 
     # Precompute Δ-space segment masks for efficiency and stability
@@ -213,11 +210,7 @@ def fit_piecewise_logistic(
             gamma_pulse = float(beta[gamma_pulse_idx])
             gamma_step = float(beta[gamma_pulse_idx + 1])
             beta_offset = gamma_pulse_idx + 2
-            gamma_exog = (
-                float(beta[beta_offset])
-                if exog is not None and len(beta) > beta_offset
-                else None
-            )
+            gamma_exog = float(beta[beta_offset]) if exog is not None and len(beta) > beta_offset else None
 
             segment_intercepts = [gamma_intercept + offsets[i] for i in range(num_segments)] if num_segments else []
 
@@ -233,6 +226,16 @@ def fit_piecewise_logistic(
             sse = float(np.square(resid.to_numpy()).sum())
             tss = float(np.square(y.to_numpy() - float(y.mean())).sum())
             r2 = 1.0 - (sse / tss if tss > 0 else np.nan)
+
+            # Soft penalty to discourage negative segment growth rates without forbidding them
+            neg_components = np.clip(-np.asarray(r_segments, dtype=float), 0.0, None)
+            if np.any(neg_components > 0):
+                penalty_strength = 0.05  # weak prior favouring non-negative growth
+                scale = tss if tss > 0 else float(np.square(y_vec).sum())
+                neg_penalty = penalty_strength * scale * float(np.square(neg_components).sum())
+            else:
+                neg_penalty = 0.0
+            score = sse + neg_penalty
 
             fit = PiecewiseLogisticFit(
                 carrying_capacity=float(K),
@@ -250,7 +253,9 @@ def fit_piecewise_logistic(
                 exog_lag=exog_lag,
             )
 
-            if sse < best_sse:
+            # Select by penalized score, tie-break by raw SSE
+            if (score < best_score) or (np.isclose(score, best_score) and sse < best_sse) or best is None:
+                best_score = score
                 best_sse = sse
                 best = fit
                 best_exog_lag = exog_lag
