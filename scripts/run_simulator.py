@@ -205,26 +205,26 @@ def run(
             schedule = AdSpendSchedule.constant(0.0)
 
         adstock_vals = []
-        prev_a = float(last_adstock)
+        prev_a = last_adstock
         for m in range(horizon):
             x = float(schedule.get_spend_for_month(m))
-            a = x + float(lam) * prev_a
+            a = x + lam * prev_a
             adstock_vals.append(a)
             prev_a = a
         x_log = [0.0] * horizon
         if theta and theta > 0:
-            x_log = [float(math.log(1.0 + a / float(theta))) for a in adstock_vals]
+            x_log = [math.log(1.0 + a / theta) for a in adstock_vals]
 
         # Piecewise segment mapping for forecast months: use last segment rate
         r_last = float(r_list[-1] if r_list else 0.0)
 
         # Simulate
-        S = [float(S0)]
+        S = [S0]
         for t in range(1, horizon + 1):
             S_prev = S[-1]
-            x_base = S_prev * (1.0 - S_prev / float(K)) if K > 0 else 0.0
+            x_base = S_prev * (1.0 - S_prev / K) if K > 0 else 0.0
             r_t = r_last
-            delta = float(gamma_intercept) + r_t * x_base
+            delta = gamma_intercept + r_t * x_base
             if gamma_exog is not None:
                 lag_idx = t - 1 - max(exog_lag, 0)
                 if lag_idx >= 0 and lag_idx < len(x_log):
@@ -233,7 +233,10 @@ def run(
 
         # Write forecast
         fc_index = pd.date_range(pd.Timestamp.today().to_period("M").to_timestamp("M"), periods=horizon, freq="ME")
-        fc_df = pd.DataFrame({"total_forecast": S[1:]}, index=fc_index)
+        fc_df = pd.DataFrame(
+            {"total_forecast": pd.Series(S[1:], index=fc_index).round().astype(int)},
+            index=fc_index,
+        )
         out_fit = Path(out_dir) / ("fitted_forecast.csv")
         fc_df.to_csv(out_fit, index_label="date")
         logger.info("Fitted-equation forecast saved: %s", str(out_fit.resolve()))

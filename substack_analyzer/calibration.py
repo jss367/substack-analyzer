@@ -108,7 +108,7 @@ def fit_piecewise_logistic(
     # Build segments on the index of y (which starts at original index[1])
     # Sanitize breakpoints relative to original series length (len(input_series))
     n_series = len(input_series)
-    bps = sorted(set(int(b) for b in breakpoints if 1 <= int(b) <= n_series - 2)) if breakpoints else []
+    bps = sorted({int(b) for b in breakpoints if 1 <= int(b) <= n_series - 2}) if breakpoints else []
     seg_bounds = _segments_from_breakpoints(n_series, bps)
     num_segments = len(seg_bounds)
 
@@ -173,12 +173,21 @@ def fit_piecewise_logistic(
         for mask in masks[1:]:
             intercept_masks.append(mask.copy())
 
+    # Hoist loop-invariant computations
+    s_lag_arr = s_lag.to_numpy().astype(float)
+    y_vec = y.to_numpy().astype(float)
+    ones_vec = np.ones(n, dtype=float)
+    lam = 1e-6
+
     for exog_lag, exog in exog_candidates:
+        # Columns count is constant across K for a given exogenous candidate
+        base_col_count = len(masks) + 1 + len(intercept_masks) + 2 + (1 if exog is not None else 0)
+        ridge_I = lam * np.eye(base_col_count)
         for K in k_grid:
-            X_base = (s_lag * (1.0 - s_lag / K)).to_numpy().astype(float)
+            X_base = s_lag_arr * (1.0 - s_lag_arr / K)
             # Build design matrix from precomputed masks
             X_cols: list[np.ndarray] = [(X_base * m) for m in masks]
-            X_cols.append(np.ones(n, dtype=float))  # global intercept baseline
+            X_cols.append(ones_vec)  # global intercept baseline
             for im in intercept_masks:
                 X_cols.append(im)
             X_cols.append(pulse)
@@ -186,14 +195,12 @@ def fit_piecewise_logistic(
             if exog is not None:
                 X_cols.append(exog)
             X = np.column_stack(X_cols)
-            y_vec = y.to_numpy().astype(float)
 
             # OLS with a tiny ridge for stability (helps when columns are nearly collinear)
-            lam = 1e-6
             XtX = X.T @ X
             Xty = X.T @ y_vec
             try:
-                beta = np.linalg.solve(XtX + lam * np.eye(X.shape[1]), Xty)
+                beta = np.linalg.solve(XtX + ridge_I, Xty)
             except np.linalg.LinAlgError:
                 # very rare; fall back to lstsq
                 beta, _, _, _ = np.linalg.lstsq(X, y_vec, rcond=None)
@@ -369,24 +376,19 @@ def fitted_series_from_params(
             y = s.diff().dropna()
             s_lag = s.shift(1).reindex(y.index).astype(float)
             # Map each delta row to its segment index
-            seg_idx_per_row: list[int] = []
-            for t in range(y.size):
-                seg_idx = 0
-                for j, (a, b) in enumerate(seg_bounds):
-                    if a <= t <= b:
-                        seg_idx = j
-                        break
-                seg_idx_per_row.append(seg_idx)
+            seg_idx_per_row: list[int] = [
+                next((j for j, (a, b) in enumerate(seg_bounds) if a <= t <= b), 0) for t in range(y.size)
+            ]
 
-            x_base = s_lag.to_numpy() * (1.0 - s_lag.to_numpy() / float(carrying_capacity))
+            x_base = s_lag.to_numpy() * (1.0 - s_lag.to_numpy() / carrying_capacity)
             contrib = np.zeros_like(x_base, dtype=float)
             for t, seg_idx in enumerate(seg_idx_per_row):
                 contrib[t] = float(r_list[seg_idx]) * x_base[t]
 
-            contrib += float(gamma_pulse) * np.asarray(pulse, dtype=float)
-            contrib += float(gamma_step) * np.asarray(step, dtype=float)
+            contrib += gamma_pulse * pulse
+            contrib += gamma_step * step
             if exog is not None and gamma_exog is not None:
-                contrib += float(gamma_exog) * exog
+                contrib += gamma_exog * exog
 
             residual = y.to_numpy(dtype=float) - contrib
             gamma_intercept = float(np.nanmean(residual)) if residual.size else 0.0
@@ -400,7 +402,7 @@ def fitted_series_from_params(
     y = s.diff().dropna()
     s_lag = s.shift(1).reindex(y.index).astype(float)
     n = len(y)
-    X_base = (s_lag * (1.0 - s_lag / float(carrying_capacity))).to_numpy(dtype=float)
+    X_base = (s_lag * (1.0 - s_lag / carrying_capacity)).to_numpy(dtype=float)
 
     masks: list[np.ndarray] = []
     for start, end in seg_bounds:
@@ -438,10 +440,10 @@ def fitted_series_from_params(
         beta[num_segments + idx] = float(intercept - baseline_intercept)
     offset_count = max(num_segments - 1, 0)
     gamma_pulse_idx = num_segments + 1 + offset_count
-    beta[gamma_pulse_idx] = float(gamma_pulse)
-    beta[gamma_pulse_idx + 1] = float(gamma_step)
+    beta[gamma_pulse_idx] = gamma_pulse
+    beta[gamma_pulse_idx + 1] = gamma_step
     if exog is not None:
-        beta[gamma_pulse_idx + 2] = float(gamma_exog or 0.0)
+        beta[gamma_pulse_idx + 2] = gamma_exog if gamma_exog is not None else 0.0
 
     y_hat = X @ beta
     s_hat = np.empty(n + 1, dtype=float)

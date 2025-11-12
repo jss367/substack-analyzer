@@ -88,12 +88,12 @@ if "events_df" not in st.session_state:
 def _clean_events_df(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize types without changing the date *month/day* a user entered."""
     logger.info("_clean_events_df has been called")
-    logger.info(f"df: {df}")
+    logger.info("df: %s", df)
     df = df.copy()
     for col in EVENTS_COLUMNS:
         if col not in df.columns:
             df[col] = None
-    logger.info(f"df after adding missing columns: {df}")
+    logger.info("df after adding missing columns: %s", df)
     # Coerce types
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
     df["cost"] = pd.to_numeric(df["cost"], errors="coerce")
@@ -101,14 +101,14 @@ def _clean_events_df(df: pd.DataFrame) -> pd.DataFrame:
     typed_lower = df.get("type").astype(str).str.lower()
     need_fill = df.get("persistence").isna() | (df.get("persistence").astype(str).str.len() == 0)
     df.loc[need_fill, "persistence"] = typed_lower.map(TYPE_TO_PERSISTENCE)
-    logger.info(f"df at the end of _clean_events_df: {df}")
+    logger.info("df at the end of _clean_events_df: %s", df)
     return df
 
 
 def _event_rules_from_events() -> alt.Chart | None:
     logger.info("_event_rules_from_events has been called")
     ev = st.session_state.get("events_df")
-    logger.info(f"ev: {ev}")
+    logger.info("ev: %s", ev)
     if not isinstance(ev, pd.DataFrame) or ev.empty or "date" not in ev.columns:
         return None
     ev2 = ev.copy()
@@ -181,16 +181,14 @@ def _event_rules_from_events() -> alt.Chart | None:
             )
         )
 
-    if not layers:
-        return None
-    return alt.layer(*layers)
+    return alt.layer(*layers) if layers else None
 
 
 def _on_events_editor_change():
     logger.info("_on_events_editor_change has been called")
     grid_dict = st.session_state.get("events_editor") or {}
-    logger.info(f"grid_dict: {grid_dict}")
-    try:
+    logger.info("grid_dict: %s", grid_dict)
+    with suppress(Exception):
         # Start from current events_df as the source of truth
         base = st.session_state.get("events_df", pd.DataFrame(columns=EVENTS_COLUMNS)).copy()
 
@@ -225,10 +223,8 @@ def _on_events_editor_change():
             base = pd.DataFrame(grid_dict)
 
         st.session_state["events_df"] = _clean_events_df(base)
-        logger.info(f"st.session_state['events_df']: {st.session_state['events_df']}")
+        logger.info("st.session_state['events_df']: %s", st.session_state['events_df'])
         _set_markers_from_events()
-    except Exception:
-        pass
 
 
 def _events_change_dates() -> list[pd.Timestamp]:
@@ -284,7 +280,7 @@ def _dates_to_breakpoint_indices(dates: list[pd.Timestamp], index: pd.DatetimeIn
         except Exception:
             continue
     # unique + sorted + valid interior indices only
-    return sorted(set(i for i in idxs if i is not None))
+    return sorted({i for i in idxs if i is not None})
 
 
 def _inject_brand_styles() -> None:
@@ -490,7 +486,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                         return run_detection(series, config=detect_cfg)
 
                     # Debug: record detection configuration
-                    try:
+                    with suppress(Exception):
                         logger.info(
                             "Detection clicked: mode=%s, max_changes=%s, target_col=%s, plot_cols=%s",
                             detect_mode,
@@ -498,11 +494,9 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             target_col,
                             list(plot_df.columns),
                         )
-                    except Exception:
-                        pass
 
                     def _log_classified(label: str, classified: list) -> None:
-                        try:
+                        with suppress(Exception):
                             rows = [
                                 {
                                     "index": int(getattr(b, "index", -1)),
@@ -516,8 +510,6 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                                 for b in (classified or [])
                             ]
                             logger.info("Detection raw (%s): %s", label, rows)
-                        except Exception:
-                            pass
 
                     # Determine which series to run on
                     detections: list[DetectionResult] = []
@@ -590,9 +582,9 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             )
                             base = st.session_state.get("events_df", pd.DataFrame(columns=EVENTS_COLUMNS))
                             merged_all = (
-                                pd.concat([base, merged_events_df], ignore_index=True)
-                                if not base.empty
-                                else merged_events_df
+                                merged_events_df
+                                if base.empty
+                                else pd.concat([base, merged_events_df], ignore_index=True)
                             )
                             # Also de-duplicate across the combined table to collapse prior duplicates
                             cleaned_all = _clean_events_df(merged_all)
@@ -652,12 +644,12 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             st.session_state["detected_change_dates"] = merged_dates
                         else:
                             # Single-series path: detector already de-dupes within-series; just map indices→dates
-                            seg_bkps = sorted(set(b.index for b in seg_effects))
+                            seg_bkps = sorted({b.index for b in seg_effects})
                             s_idx = plot_df[target_col].dropna().index if target_col is not None else plot_df.index
                             st.session_state["detected_change_dates"] = [s_idx[i] for i in seg_bkps if i < len(s_idx)]
 
                         st.session_state["detected_breakpoints"] = seg_bkps
-                        try:
+                        with suppress(Exception):
                             logger.info(
                                 "Detection result: mode=%s, label=%s, seg_bkps=%s, change_dates=%s",
                                 detect_mode,
@@ -668,8 +660,6 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                                     for d in st.session_state.get("detected_change_dates", [])
                                 ],
                             )
-                        except Exception:
-                            pass
                         # Save a human-readable label of what we detected on
                         if detect_mode == "both":
                             st.session_state["detected_target_label"] = "Total+Paid"
@@ -728,9 +718,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
             }
             base = st.session_state.get("events_df", pd.DataFrame(columns=EVENTS_COLUMNS))
             merged = (
-                pd.concat([base, pd.DataFrame([new_row])], ignore_index=True)
-                if not base.empty
-                else pd.DataFrame([new_row])
+                pd.DataFrame([new_row]) if base.empty else pd.concat([base, pd.DataFrame([new_row])], ignore_index=True)
             )
             st.session_state["events_df"] = _clean_events_df(merged)
             _set_markers_from_events()
@@ -759,15 +747,15 @@ def events_features_ui(plot_df: pd.DataFrame) -> None:
             st.session_state["events_df"] = _ev_backup
         # ------------------------------------------------------------------------------
 
-        st.session_state["adstock_lambda"] = float(lam_current)
-        st.session_state["ad_log_theta"] = float(theta_current)
+        st.session_state["adstock_lambda"] = lam_current
+        st.session_state["ad_log_theta"] = theta_current
         st.session_state["covariates_df"] = covariates_df
         st.session_state["features_df"] = features_df
         st.markdown(f"Using λ={lam_current:0.2f}, θ={theta_current:0.0f} (adjustable from the sidebar).")
         st.markdown("**Outputs**: `events_df` (above), `covariates_df`, `features_df`.")
         st.dataframe(features_df.reset_index(), width="stretch")
         # Log Phase 1 readiness for Phase 2 handoff
-        try:
+        with suppress(Exception):
             _bkps = list(st.session_state.get("detected_breakpoints", []))
             _n_events = 0 if st.session_state.get("events_df") is None else len(st.session_state.get("events_df"))
             _n_ad_rows = len(covariates_df) if isinstance(covariates_df, pd.DataFrame) else 0
@@ -778,8 +766,6 @@ def events_features_ui(plot_df: pd.DataFrame) -> None:
                 _n_ad_rows,
             )
             logger.info("Use 'Download phase1.json' to save handoff to Phase 2.")
-        except Exception:
-            pass
         # Phase 1 handoff: import portable artifact
         uploaded_phase1 = st.file_uploader("Load phase1.json", type=["json"], key="phase1_json")
         if uploaded_phase1 is not None:
@@ -1049,7 +1035,7 @@ def tail_view_ui(
     base_chart = plot_series(tail_df, use_dual_axis=use_dual_axis, show_total=show_total, series_title=series_title)
 
     if target_col is not None and breakpoints:
-        try:
+        with suppress(Exception):
             full_s = plot_df[target_col].dropna()
             segs = compute_segment_slopes(full_s, breakpoints)
             tail_start, tail_end = tail_df.index[0], tail_df.index[-1]
@@ -1058,8 +1044,7 @@ def tail_view_ui(
             for seg in segs_t:
                 xs = pd.date_range(max(seg.start_date, tail_start), min(seg.end_date, tail_end), freq="ME")
                 start_val = float(full_s.loc[seg.start_date])
-                for i, d in enumerate(xs):
-                    fit_rows_t.append({"date": d, "Fit": start_val + seg.slope_per_month * i})
+                fit_rows_t.extend({"date": d, "Fit": start_val + seg.slope_per_month * i} for i, d in enumerate(xs))
             if fit_rows_t:
                 fit_df_t = pd.DataFrame(fit_rows_t)
                 fit_t = (
@@ -1080,8 +1065,6 @@ def tail_view_ui(
                     )
                 )
                 base_chart = alt.layer(base_chart, fit_t).resolve_scale(y="independent").properties(height=240)
-        except Exception:
-            pass
 
     st.altair_chart(base_chart, use_container_width=True)
 
@@ -1161,16 +1144,21 @@ def slider_state(label: str, *, key: str, default_value, **kwargs):
     return st.slider(label, **kwargs)
 
 
+def _render_include_checkboxes(has_fit: bool, fit_key: str, sim_key: str) -> tuple[bool, bool]:
+    include_fit = st.checkbox("Include model fit", value=has_fit, key=fit_key)
+    include_sim = st.checkbox("Include simulation results", value=False, key=sim_key)
+    return include_fit, include_sim
+
+
 def sidebar_inputs() -> SimulationInputs:
     st.sidebar.header("Assumptions")
 
     # Brief status: show fitted segment growth rates if available
     fit_side = st.session_state.get("pwlog_fit")
-    seg_rates = coerce_list(getattr(fit_side, "segment_growth_rates", None))
-    if seg_rates:
+    if seg_rates := coerce_list(getattr(fit_side, "segment_growth_rates", None)):
         # Prefer live overrides if present
         r_over = st.session_state.get("modelfit_r")
-        r_src = r_over if r_over else seg_rates
+        r_src = r_over or seg_rates
         r_list_str = ", ".join(f"r{j+1}={r:0.3f}" for j, r in enumerate(r_src))
         st.sidebar.markdown(f"**Segments (r):** {r_list_str}")
 
@@ -1431,10 +1419,10 @@ def sidebar_inputs() -> SimulationInputs:
     organic_from_fit = float(_r_now[-1]) if (_r_now and len(_r_now) > 0) else float(organic_growth)
 
     return SimulationInputs(
-        starting_free_subscribers=int(start_free),
-        starting_premium_subscribers=int(start_premium),
-        horizon_months=int(horizon),
-        organic_monthly_growth_rate=float(organic_from_fit),
+        starting_free_subscribers=start_free,
+        starting_premium_subscribers=start_premium,
+        horizon_months=horizon,
+        organic_monthly_growth_rate=organic_from_fit,
         monthly_churn_rate_free=float(churn_free),
         monthly_churn_rate_premium=float(churn_prem),
         new_subscriber_premium_conv_rate=float(conv_new),
@@ -1544,8 +1532,10 @@ def render_estimators() -> None:
             # Use imported series when available
             series_map = {}
             with suppress(Exception):
-                series_map.update({"Total": st.session_state.get("import_total")})
-                series_map.update({"Paid": st.session_state.get("import_paid")})
+                series_map |= {
+                    "Total": st.session_state.get("import_total"),
+                    "Paid": st.session_state.get("import_paid"),
+                }
                 if series_map.get("Total") is not None and series_map.get("Paid") is not None:
                     series_map["Free"] = series_map["Total"] - series_map["Paid"]
             if (s := series_map.get(target)) is not None and date_str:
@@ -1562,7 +1552,7 @@ def render_estimators() -> None:
         ev = st.session_state.get("events_df")
         total_series = st.session_state.get("import_total")
         if ev is not None and total_series is not None:
-            ev2 = ev.dropna(subset=["date"]) if not ev.empty else ev
+            ev2 = ev if ev.empty else ev.dropna(subset=["date"])
             if ev2 is not None and not ev2.empty:
                 ev2 = ev2.copy()
                 # Coerce invalid dates to NaT then drop them
@@ -1660,7 +1650,7 @@ def render_save_load() -> None:
     c1, c2 = st.columns(2)
     with c1:
         has_fit = st.session_state.get("pwlog_fit") is not None
-        include_fit = st.checkbox("Include model fit", value=bool(has_fit))
+        include_fit = st.checkbox("Include model fit", value=has_fit)
         include_sim = st.checkbox("Include simulation results", value=False)
         bundle = collect_session_bundle(include_fit, include_sim)
         st.download_button(
@@ -1837,7 +1827,7 @@ def _stage2_events_and_detection(plot_df: pd.DataFrame) -> tuple[list[int], str 
     bkps_from_events = _dates_to_breakpoint_indices(change_dates, idx)
     # Prefer classifier-detected indices (stored in session_state["detected_breakpoints"]) over event-derived
     bkps_from_classifier = list(st.session_state.get("detected_breakpoints", []))
-    chosen = bkps_from_classifier if bkps_from_classifier else (bkps_from_events if bkps_from_events else detected)
+    chosen = bkps_from_classifier or bkps_from_events or detected
     return chosen, target_col
 
 
@@ -1862,8 +1852,7 @@ def render_data_import() -> None:
     # Quick save/load
     with st.expander("Save / Load (quick access)", expanded=False):
         has_fit_i = st.session_state.get("pwlog_fit") is not None
-        include_fit_i = st.checkbox("Include model fit", value=bool(has_fit_i), key="import_include_fit")
-        include_sim_i = st.checkbox("Include simulation results", value=False, key="import_include_sim")
+        include_fit_i, include_sim_i = _render_include_checkboxes(has_fit_i, "import_include_fit", "import_include_sim")
         bundle_i = collect_session_bundle(include_fit_i, include_sim_i)
         st.download_button(
             "Export my config (.zip)",
@@ -2034,8 +2023,12 @@ with tab_sim:
                 k_now, r_now, gp_now2, gs_now2, gx_now2 = _current_fit_params()
                 k_disp = f"{int(float(k_now)):,}"
                 rs = ", ".join(f"{r:0.3f}" for r in (r_now or []))
-                bullets.append(f"- Stage 4 (Model fit): K={k_disp}; r by segment=[{rs}]")
-                bullets.append(f"  - Events: gamma_pulse={gp_now2:0.3f}, gamma_step={gs_now2:0.3f}")
+                bullets.extend(
+                    [
+                        f"- Stage 4 (Model fit): K={k_disp}; r by segment=[{rs}]",
+                        f"  - Events: gamma_pulse={gp_now2:0.3f}, gamma_step={gs_now2:0.3f}",
+                    ]
+                )
                 if gx_now2 is not None:
                     bullets.append(f"  - Exogenous (log ad effect): gamma_exog={float(gx_now2):0.3f}")
             except Exception:
@@ -2053,7 +2046,7 @@ with tab_sim:
         st.markdown("\n".join(nxt))
     with st.expander("Save / Load (quick access)", expanded=False):
         has_fit_q = st.session_state.get("pwlog_fit") is not None
-        include_fit_q = st.checkbox("Include model fit", value=bool(has_fit_q), key="quick_include_fit")
+        include_fit_q = st.checkbox("Include model fit", value=has_fit_q, key="quick_include_fit")
         include_sim_q = st.checkbox("Include simulation results", value=False, key="quick_include_sim")
         bundle_q = collect_session_bundle(include_fit_q, include_sim_q)
         st.download_button(
