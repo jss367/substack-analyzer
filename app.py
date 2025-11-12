@@ -1991,66 +1991,55 @@ with tab_sim:
         )
         st.latex(eq_sim)
 
-    # Stage 7 summary: what we've done, what's calculated, what's next
-    with st.expander("What we've done so far, what's calculated, and what's next", expanded=True):
-        obs = st.session_state.get("observations_df")
-        events_df = st.session_state.get("events_df")
-        cov_df = st.session_state.get("covariates_df")
-        feat_df = st.session_state.get("features_df")
-        adds_df = st.session_state.get("adds_df")
-        churn_df = st.session_state.get("churn_df")
-        fit = st.session_state.get("pwlog_fit")
-        lam = st.session_state.get("adstock_lambda")
-        theta = st.session_state.get("ad_log_theta")
+    # Stage 7 summary: surface a concise status snapshot
+    obs = st.session_state.get("observations_df")
+    events_df = st.session_state.get("events_df")
+    cov_df = st.session_state.get("covariates_df")
+    feat_df = st.session_state.get("features_df")
+    adds_df = st.session_state.get("adds_df")
+    churn_df = st.session_state.get("churn_df")
+    fit = st.session_state.get("pwlog_fit")
+    lam = st.session_state.get("adstock_lambda")
+    theta = st.session_state.get("ad_log_theta")
 
-        st.markdown("**Done so far**")
-        bullets = []
-        if obs is not None:
-            bullets.append(f"- Stage 1 (observations_df): {len(obs)} rows at current granularity")
-        if events_df is not None and not getattr(events_df, "empty", True):
-            try:
-                n_events = len(events_df.dropna(subset=["date"]))
-            except Exception:
-                n_events = len(events_df)
-            bullets.append(f"- Stage 2 (events_df): {n_events} {'event' if n_events == 1 else 'events'} annotated")
-        if cov_df is not None:
-            bullets.append("- Stage 2 (covariates_df): ad spend indexed monthly")
-        if feat_df is not None and not getattr(feat_df, "empty", True):
-            lam_str = "?" if lam is None else f"{lam:0.2f}"
-            theta_str = "?" if theta is None else f"{theta:0.2f}"
-            bullets.append(
-                f"- Stage 2 (features_df): adstock a_t = x_t + lambda * a_(t-1) and log response log(1 + a_t/theta) built (lambda={lam_str}, theta={theta_str})"
-            )
-        if adds_df is not None and not getattr(adds_df, "empty", True):
-            bullets.append(f"- Stage 3 (adds_df): {len(adds_df)} monthly rows")
-        if churn_df is not None and not getattr(churn_df, "empty", True):
-            bullets.append(f"- Stage 3 (churn_df): {len(churn_df)} monthly rows")
-        if fit is not None:
-            try:
-                k_now, r_now, gp_now2, gs_now2, gx_now2 = _current_fit_params()
-                k_disp = f"{int(float(k_now)):,}"
-                rs = ", ".join(f"{r:0.3f}" for r in (r_now or []))
-                bullets.extend(
-                    [
-                        f"- Stage 4 (Model fit): K={k_disp}; r by segment=[{rs}]",
-                        f"  - Events: gamma_pulse={gp_now2:0.3f}, gamma_step={gs_now2:0.3f}",
-                    ]
-                )
-                if gx_now2 is not None:
-                    bullets.append(f"  - Exogenous (log ad effect): gamma_exog={float(gx_now2):0.3f}")
-            except Exception:
-                bullets.append("- Stage 4 (Model fit): available")
-        if not bullets:
-            bullets.append("- No prior stages detected yet. Use the Estimators tab to run 1–5.")
-        st.markdown("\n".join(bullets))
+    status_bits: list[str] = []
+    if obs is not None:
+        status_bits.append(f"Stage 1: {len(obs)} observations")
+    if events_df is not None and not getattr(events_df, "empty", True):
+        try:
+            n_events = len(events_df.dropna(subset=["date"]))
+        except Exception:
+            n_events = len(events_df)
+        status_bits.append(f"Stage 2 events: {n_events}")
+    if cov_df is not None:
+        status_bits.append("Stage 2 covariates ready")
+    if feat_df is not None and not getattr(feat_df, "empty", True):
+        lam_str = "?" if lam is None else f"{lam:0.2f}"
+        theta_str = "?" if theta is None else f"{theta:0.2f}"
+        status_bits.append(f"Stage 2 features λ={lam_str}, θ={theta_str}")
+    if adds_df is not None and not getattr(adds_df, "empty", True):
+        status_bits.append(f"Stage 3 adds: {len(adds_df)} rows")
+    if churn_df is not None and not getattr(churn_df, "empty", True):
+        status_bits.append(f"Stage 3 churn: {len(churn_df)} rows")
+    if fit is not None:
+        try:
+            k_now, r_now, gp_now2, gs_now2, gx_now2 = _current_fit_params()
+            k_disp = f"{int(float(k_now)):,}"
+            rs = ", ".join(f"{r:0.3f}" for r in (r_now or []))
+            status_bits.append(f"Stage 4 fit: K={k_disp}; r=[{rs}]")
+            status_bits.append(f"Stage 4 events γpulse={gp_now2:0.3f}, γstep={gs_now2:0.3f}")
+            if gx_now2 is not None:
+                status_bits.append(f"Stage 4 exogenous γ={float(gx_now2):0.3f}")
+        except Exception:
+            status_bits.append("Stage 4 fit ready")
 
-        st.markdown("**What we'll do next**")
-        nxt = [
-            "- Set assumptions in the sidebar: growth, churn, conversion, pricing, CAC, ad spend.",
-            "- Run the Simulator below to project subscribers, revenue, ROAS, and payback.",
-            "- Optional: use the model fit to calibrate growth dynamics from the Estimators tab.",
-        ]
-        st.markdown("\n".join(nxt))
+    if status_bits:
+        st.caption(" • ".join(status_bits))
+
+    st.info(
+        "Next: set sidebar assumptions (growth, churn, conversion, pricing, CAC, ad spend) and run the "
+        "Simulator to project subscribers, revenue, ROAS, and payback."
+    )
     with st.expander("Save / Load (quick access)", expanded=False):
         has_fit_q = st.session_state.get("pwlog_fit") is not None
         include_fit_q = st.checkbox("Include model fit", value=has_fit_q, key="quick_include_fit")
