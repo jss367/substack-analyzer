@@ -380,6 +380,19 @@ def _get_state(key: str, default):
     return st.session_state.get(key, default)
 
 
+def _safe_float(value: Any, fallback: float = 0.0) -> float:
+    """Coerce model parameters to float without raising when None or invalid."""
+
+    try:
+        if value is None:
+            return float(fallback)
+        if isinstance(value, float) and math.isnan(value):
+            return float(fallback)
+        return float(value)
+    except (TypeError, ValueError):
+        return float(fallback)
+
+
 def _apply_pending_state_updates() -> None:
     """Apply any deferred session state updates before widgets render."""
 
@@ -946,19 +959,23 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
 
             # ----- initialize sidebar override defaults if absent -----
             if "modelfit_K" not in st.session_state:
-                st.session_state["modelfit_K"] = float(getattr(fit, "carrying_capacity", 0.0))
+                st.session_state["modelfit_K"] = _safe_float(getattr(fit, "carrying_capacity", None), 0.0)
             if "modelfit_gamma_pulse" not in st.session_state:
-                st.session_state["modelfit_gamma_pulse"] = float(getattr(fit, "gamma_pulse", 0.0))
+                st.session_state["modelfit_gamma_pulse"] = _safe_float(getattr(fit, "gamma_pulse", None), 0.0)
             if "modelfit_gamma_step" not in st.session_state:
-                st.session_state["modelfit_gamma_step"] = float(getattr(fit, "gamma_step", 0.0) or 0.0)
+                st.session_state["modelfit_gamma_step"] = _safe_float(getattr(fit, "gamma_step", None), 0.0)
             if getattr(fit, "gamma_exog", None) is not None and "modelfit_gamma_exog" not in st.session_state:
-                st.session_state["modelfit_gamma_exog"] = float(getattr(fit, "gamma_exog", 0.0))
+                st.session_state["modelfit_gamma_exog"] = _safe_float(getattr(fit, "gamma_exog", None), 0.0)
             fit_r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
             fit_intercepts = coerce_list(getattr(fit, "segment_intercepts", None))
 
             existing_r = coerce_list(st.session_state.get("modelfit_r"))
             if ("modelfit_r" not in st.session_state) or (len(existing_r) != len(fit_r_list)):
                 st.session_state["modelfit_r"] = fit_r_list
+                if fit_r_list:
+                    st.session_state["modelfit_r_last"] = _safe_float(fit_r_list[-1], 0.0)
+            elif ("modelfit_r_last" not in st.session_state) and existing_r:
+                st.session_state["modelfit_r_last"] = _safe_float(existing_r[-1], 0.0)
 
             existing_intercepts = coerce_list(st.session_state.get("modelfit_intercepts"))
             if ("modelfit_intercepts" not in st.session_state) or (
@@ -969,24 +986,34 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             # ----- read current overrides & recompute fitted line with them -----
             def _current_fit_params():
                 fit_obj = st.session_state.get("pwlog_fit")
-                k_val = float(st.session_state.get("modelfit_K", getattr(fit_obj, "carrying_capacity", 0.0) or 0.0))
-                r_list = coerce_list(
-                    st.session_state.get(
-                        "modelfit_r",
-                        coerce_list(getattr(fit_obj, "segment_growth_rates", None)),
-                    )
+                k_src = st.session_state.get(
+                    "modelfit_K",
+                    getattr(fit_obj, "carrying_capacity", 0.0) if fit_obj is not None else 0.0,
                 )
+                k_val = _safe_float(k_src, 0.0)
+                r_source = st.session_state.get(
+                    "modelfit_r",
+                    coerce_list(getattr(fit_obj, "segment_growth_rates", None)),
+                )
+                r_list = [_safe_float(val, 0.0) for val in coerce_list(r_source)]
                 intercepts = coerce_list(
                     st.session_state.get(
                         "modelfit_intercepts",
                         coerce_list(getattr(fit_obj, "segment_intercepts", None)),
                     )
                 )
-                gp_val = float(
-                    st.session_state.get("modelfit_gamma_pulse", getattr(fit_obj, "gamma_pulse", 0.0) or 0.0)
+                gp_src = st.session_state.get(
+                    "modelfit_gamma_pulse",
+                    getattr(fit_obj, "gamma_pulse", 0.0) if fit_obj is not None else 0.0,
                 )
-                gs_val = float(st.session_state.get("modelfit_gamma_step", getattr(fit_obj, "gamma_step", 0.0) or 0.0))
-                gx_val = st.session_state.get("modelfit_gamma_exog", getattr(fit_obj, "gamma_exog", None))
+                gp_val = _safe_float(gp_src, 0.0)
+                gs_src = st.session_state.get(
+                    "modelfit_gamma_step",
+                    getattr(fit_obj, "gamma_step", 0.0) if fit_obj is not None else 0.0,
+                )
+                gs_val = _safe_float(gs_src, 0.0)
+                gx_raw = st.session_state.get("modelfit_gamma_exog", getattr(fit_obj, "gamma_exog", None))
+                gx_val = None if gx_raw is None else _safe_float(gx_raw, 0.0)
                 return k_val, r_list, intercepts, gp_val, gs_val, gx_val
 
             K_now, r_list_now, intercepts_now, gp_now, gs_now, gx_now = _current_fit_params()
@@ -1100,16 +1127,28 @@ def _current_fit_params():
     Returns (K, r_list, gamma_pulse, gamma_step, gamma_exog).
     """
     fit_obj = st.session_state.get("pwlog_fit")
-    k_val = float(st.session_state.get("modelfit_K", getattr(fit_obj, "carrying_capacity", 0.0) or 0.0))
-    r_list = coerce_list(
-        st.session_state.get(
-            "modelfit_r",
-            coerce_list(getattr(fit_obj, "segment_growth_rates", None)),
-        )
+    k_src = st.session_state.get(
+        "modelfit_K",
+        getattr(fit_obj, "carrying_capacity", 0.0) if fit_obj is not None else 0.0,
     )
-    gp_val = float(st.session_state.get("modelfit_gamma_pulse", getattr(fit_obj, "gamma_pulse", 0.0) or 0.0))
-    gs_val = float(st.session_state.get("modelfit_gamma_step", getattr(fit_obj, "gamma_step", 0.0) or 0.0))
-    gx_val = st.session_state.get("modelfit_gamma_exog", getattr(fit_obj, "gamma_exog", None))
+    k_val = _safe_float(k_src, 0.0)
+    r_source = st.session_state.get(
+        "modelfit_r",
+        coerce_list(getattr(fit_obj, "segment_growth_rates", None)),
+    )
+    r_list = [_safe_float(val, 0.0) for val in coerce_list(r_source)]
+    gp_src = st.session_state.get(
+        "modelfit_gamma_pulse",
+        getattr(fit_obj, "gamma_pulse", 0.0) if fit_obj is not None else 0.0,
+    )
+    gp_val = _safe_float(gp_src, 0.0)
+    gs_src = st.session_state.get(
+        "modelfit_gamma_step",
+        getattr(fit_obj, "gamma_step", 0.0) if fit_obj is not None else 0.0,
+    )
+    gs_val = _safe_float(gs_src, 0.0)
+    gx_raw = st.session_state.get("modelfit_gamma_exog", getattr(fit_obj, "gamma_exog", None))
+    gx_val = None if gx_raw is None else _safe_float(gx_raw, 0.0)
     return k_val, r_list, gp_val, gs_val, gx_val
 
 
@@ -1474,7 +1513,7 @@ def sidebar_inputs() -> SimulationInputs:
                 k_val = number_input_state(
                     "K (carrying capacity)",
                     min_value=0.0,
-                    default_value=float(getattr(fit, "carrying_capacity", 0.0)),
+                    default_value=_safe_float(getattr(fit, "carrying_capacity", None), 0.0),
                     step=100.0,
                     key="modelfit_K",
                 )
@@ -1482,7 +1521,7 @@ def sidebar_inputs() -> SimulationInputs:
                     "gamma_pulse",
                     min_value=-10.0,
                     max_value=10.0,
-                    default_value=float(getattr(fit, "gamma_pulse", 0.0)),
+                    default_value=_safe_float(getattr(fit, "gamma_pulse", None), 0.0),
                     step=0.001,
                     key="modelfit_gamma_pulse",
                 )
@@ -1490,7 +1529,7 @@ def sidebar_inputs() -> SimulationInputs:
                     "gamma_step",
                     min_value=-10.0,
                     max_value=10.0,
-                    default_value=float(getattr(fit, "gamma_step", 0.0) or 0.0),
+                    default_value=_safe_float(getattr(fit, "gamma_step", None), 0.0),
                     step=0.001,
                     key="modelfit_gamma_step",
                 )
@@ -1500,7 +1539,7 @@ def sidebar_inputs() -> SimulationInputs:
                         "gamma_exog (log ad)",
                         min_value=-10.0,
                         max_value=10.0,
-                        default_value=float(gx0),
+                        default_value=_safe_float(gx0, 0.0),
                         step=0.001,
                         key="modelfit_gamma_exog",
                     )
@@ -1515,32 +1554,36 @@ def sidebar_inputs() -> SimulationInputs:
         if fit is None:
             base_r_list = coerce_list(st.session_state.get("modelfit_r"))
         if not base_r_list:
-            base_r_list = [float(_get_state("organic_growth", 0.01))]
+            base_r_list = [_safe_float(_get_state("organic_growth", 0.01), 0.01)]
 
-        # Ensure stale segment keys are cleared if the count shrinks
-        existing_segment_keys = [key for key in list(st.session_state.keys()) if key.startswith("modelfit_r_")]
-        for key in existing_segment_keys:
-            try:
-                idx = int(key.rsplit("_", 1)[-1])
-            except ValueError:
-                continue
-            if idx > len(base_r_list):
+        organic_default = _safe_float(_get_state("organic_growth", 0.01), 0.01)
+        base_r_list = [_safe_float(val, organic_default) for val in coerce_list(base_r_list)]
+
+        # Remove legacy per-segment widget keys to avoid stale values lingering in state
+        for key in list(st.session_state.keys()):
+            if key.startswith("modelfit_r_"):
                 del st.session_state[key]
 
-        r_over = []
-        for j, rj in enumerate(base_r_list, start=1):
-            r_val = number_input_state(
-                f"r segment {j}",
-                min_value=-10.0,
-                max_value=10.0,
-                default_value=float(rj),
-                step=0.001,
-                key=f"modelfit_r_{j}",
-            )
-            r_over.append(float(r_val))
+        last_segment_default = base_r_list[-1] if base_r_list else organic_default
+        last_r_val = number_input_state(
+            "Last segment growth rate (r)",
+            min_value=-10.0,
+            max_value=10.0,
+            default_value=last_segment_default,
+            step=0.001,
+            key="modelfit_r_last",
+        )
+
+        if base_r_list:
+            r_over = list(base_r_list)
+            r_over[-1] = float(last_r_val)
+        else:
+            r_over = [float(last_r_val)]
 
         # Persist aggregate list (non-widget key) for convenience
         st.session_state["modelfit_r"] = r_over
+        if r_over:
+            st.session_state["modelfit_r_last"] = float(r_over[-1])
 
     # Map model-fit overrides into simulator: use last segment r as organic growth if available
     _k_now, _r_now, _gp_now, _gs_now, _gx_now = _current_fit_params()
