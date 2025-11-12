@@ -2196,10 +2196,6 @@ with tab_sim:
     with st.expander("Monthly details", expanded=False):
         st.dataframe(sim_df, width="stretch")
     render_charts(sim_df)
-    st.caption(
-        "MVP model: instant conversion of a share of new free subs, small ongoing conversion of existing free base, "
-        "and simple net revenue after Substack + Stripe fees."
-    )
 
 with tab_stages:
     render_stages_tab()
