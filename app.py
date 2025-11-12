@@ -1238,12 +1238,12 @@ def sidebar_inputs() -> SimulationInputs:
 
     # Brief status: show fitted segment growth rates if available
     fit_side = st.session_state.get("pwlog_fit")
-    if seg_rates := coerce_list(getattr(fit_side, "segment_growth_rates", None)):
-        # Prefer live overrides if present
-        r_over = st.session_state.get("modelfit_r")
-        r_src = r_over or seg_rates
-        r_list_str = ", ".join(f"r{j+1}={r:0.3f}" for j, r in enumerate(r_src))
-        st.sidebar.markdown(f"**Segments (r):** {r_list_str}")
+    r_overrides = coerce_list(st.session_state.get("modelfit_r"))
+    if not r_overrides and fit_side is not None:
+        r_overrides = coerce_list(getattr(fit_side, "segment_growth_rates", None))
+    if r_overrides:
+        r_list_str = ", ".join(f"r{j+1}={r:0.3f}" for j, r in enumerate(r_overrides))
+        st.sidebar.caption(f"Segments (r): {r_list_str}. Edit under Model fit parameters.")
 
     with st.sidebar.expander("Starting point", expanded=True):
         start_free = number_input_state(
@@ -1451,10 +1451,10 @@ def sidebar_inputs() -> SimulationInputs:
         )
 
     # Model fit parameters (read from fit; allow manual override for what-if scenarios)
-    with st.sidebar.expander("Model fit parameters", expanded=False):
+    with st.sidebar.expander("Model fit parameters", expanded=True):
         fit = st.session_state.get("pwlog_fit")
         if fit is None:
-            st.caption("No model fit available yet. Run Model fit on the Estimators tab.")
+            st.caption("No model fit available yet. Run Model fit on the Estimators tab or edit r below for simulations.")
         else:
             try:
                 k_val = number_input_state(
@@ -1492,23 +1492,41 @@ def sidebar_inputs() -> SimulationInputs:
                     )
 
                 # Segment growth rates r_j
-                r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
-                r_over = []
-                for j, rj in enumerate(r_list, start=1):
-                    r_val = number_input_state(
-                        f"r segment {j}",
-                        min_value=-10.0,
-                        max_value=10.0,
-                        default_value=float(rj),
-                        step=0.001,
-                        key=f"modelfit_r_{j}",
-                    )
-                    r_over.append(float(r_val))
-
-                # Persist aggregate list (non-widget key) for convenience
-                st.session_state["modelfit_r"] = r_over
+                base_r_list = coerce_list(st.session_state.get("modelfit_r"))
+                if not base_r_list:
+                    base_r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
             except Exception:
                 st.caption("Model fit parameters available, but could not render editor.")
+                base_r_list = []
+        if fit is None:
+            base_r_list = coerce_list(st.session_state.get("modelfit_r"))
+        if not base_r_list:
+            base_r_list = [float(_get_state("organic_growth", 0.01))]
+
+        # Ensure stale segment keys are cleared if the count shrinks
+        existing_segment_keys = [key for key in list(st.session_state.keys()) if key.startswith("modelfit_r_")]
+        for key in existing_segment_keys:
+            try:
+                idx = int(key.rsplit("_", 1)[-1])
+            except ValueError:
+                continue
+            if idx > len(base_r_list):
+                del st.session_state[key]
+
+        r_over = []
+        for j, rj in enumerate(base_r_list, start=1):
+            r_val = number_input_state(
+                f"r segment {j}",
+                min_value=-10.0,
+                max_value=10.0,
+                default_value=float(rj),
+                step=0.001,
+                key=f"modelfit_r_{j}",
+            )
+            r_over.append(float(r_val))
+
+        # Persist aggregate list (non-widget key) for convenience
+        st.session_state["modelfit_r"] = r_over
 
     # Map model-fit overrides into simulator: use last segment r as organic growth if available
     _k_now, _r_now, _gp_now, _gs_now, _gx_now = _current_fit_params()
