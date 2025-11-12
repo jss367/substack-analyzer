@@ -1767,29 +1767,19 @@ def render_help() -> None:
     st.subheader("How to map Substack stats to this simulator")
     st.markdown(
         """
-1) Organic monthly growth (free)
-- Use Subscribers over time (or export). Compute organic new = total new free − new free from ads.
-- Monthly organic rate ≈ organic new ÷ (months × average free base).
+**Key Simulator inputs and where to source them**
 
-2) Monthly churn (free and premium)
-- Use unsubscribes + list cleaning totals. Monthly churn ≈ churned ÷ (months × average cohort size).
+| Simulator input | Where to pull the numbers | How to translate your data |
+| --- | --- | --- |
+| Organic monthly growth (free) | **Audience → Subscribers → Over time** (or export). | Organic new = total new free − new free from ads. Monthly rate ≈ organic new ÷ (months × average free base). |
+| Monthly churn (free & premium) | **Audience → Subscribers → Unsubscribes** plus list cleaning totals. | Monthly churn ≈ total churned ÷ (months × average cohort size). |
+| CAC (cost per new free) | Your ad manager or Substack source tags marked as paid. | CAC = ad spend ÷ new free from ads in the same period. |
+| New-subscriber premium conversion | Recent month of **Revenue → Subscriptions** broken out by signup source. | New premium from first-month signups ÷ number of new free that month. |
+| Ongoing premium conversion | Premium upgrades not tied to first-month signups. | Monthly conversion ≈ upgrades ÷ (months × average free). |
+| Pricing & fees | Subscription settings, Substack/Stripe statements. | Defaults: Substack 10%, Stripe 3.6% + $0.30. Adjust to match your setup. |
+| Ad spend schedule | Ad platform pacing or budgeting docs. | Two-stage schedule covers months 0–23 vs 24–59; constant spend is a single monthly number. |
 
-3) CAC (cost per new free)
-- CAC = ad spend ÷ new free from ads in the same period. Use your ad manager or Substack source tags.
-
-4) New-subscriber premium conversion
-- In a recent month, new premium from brand‑new free signups ÷ number of new free that month.
-
-5) Ongoing premium conversion of existing free
-- Premium upgrades not tied to first‑month signups ÷ (months × average free).
-
-6) Pricing and fees
-- Defaults: Substack 10%, Stripe 3.6% + $0.30. Adjust to your setup.
-
-7) Ad spend schedule
-- Two-stage: months 0–23 vs 24–59. Constant: one number.
-
-Use the Estimators tab to compute these, then plug them into the Simulator sidebar.
+Use the Estimators tab to turn exports into these inputs, then paste the results into the Simulator sidebar.
         """
     )
 
