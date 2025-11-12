@@ -88,53 +88,46 @@ STAGE_PHASES = [
     {
         "title": "Phase 1 — Fit & diagnostics",
         "summary": (
-            "Stages 1–5 live on the Data Import tab. They clean the Substack exports,"
-            " annotate events, derive heuristic adds/churn, run the piecewise logistic fit,"
-            " and package a `phase1.json` handoff for Phase 2."
+            "This phase happens on the Data Import tab. It cleans Substack exports, annotates events,"
+            " derives heuristic adds and churn, fits the piecewise logistic model, and prepares a `phase1.json` handoff."
         ),
         "stages": [
             {
                 "label": "Stage 1 — Import & normalization",
-                "status": "✅ Implemented",
                 "details": [
-                    "Uploads All and Paid subscriber exports (CSV/XLSX) with selectable columns.",
-                    "Resamples to month-end, derives Free = Total − Paid, and saves `observations_df` with download.",
-                    "Stores the cleaned table in session state for downstream stages and `phase1.json` exports.",
+                    "Upload All and Paid subscriber exports (CSV/XLSX) with selectable columns.",
+                    "Resample to month-end, derive Free = Total − Paid, and create `observations_df` for download.",
+                    "Store the cleaned table in session state for downstream stages and `phase1.json` exports.",
                 ],
             },
             {
                 "label": "Stage 2 — Events & features",
-                "status": "✅ Implemented",
                 "details": [
-                    "Editable event grid with change-point detection assists and cost/notes metadata.",
-                    "Builds `events_df`, `covariates_df`, and `features_df` using adstock + log response parameters from the sidebar.",
-                    "Supports importing/exporting `phase1.json` to hand off breakpoints, events, and ad spend.",
+                    "Use the editable event grid with change-point detection assists plus cost/notes metadata.",
+                    "Build `events_df`, `covariates_df`, and `features_df` using adstock and log-response parameters from the sidebar.",
+                    "Import or export `phase1.json` to hand off breakpoints, events, and ad spend.",
                 ],
             },
             {
                 "label": "Stage 3 — Adds & churn",
-                "status": "⚠️ MVP (heuristic path)",
                 "details": [
-                    "Derives monthly `adds_df` and `churn_df` from totals using user-supplied churn-rate estimates.",
-                    "Provides CSV downloads for both tables; latent adds/churn decomposition remains planned.",
+                    "Derive monthly `adds_df` and `churn_df` from totals using user-supplied churn-rate estimates.",
+                    "Download CSVs for both tables while exploring latent adds/churn decomposition options.",
                 ],
             },
             {
                 "label": "Stage 4 — Quick fit",
-                "status": "⚠️ MVP (piecewise logistic)",
                 "details": [
-                    "Fits a piecewise logistic model with detected breakpoints and optional ad-response regressor.",
-                    "Exposes carrying capacity, per-segment growth rates, and event coefficients with override sliders.",
-                    "Exports fitted overlays, optional forward projections, and the growth equation for Phase 2.",
+                    "Fit a piecewise logistic model with detected breakpoints and optional ad-response regressor.",
+                    "Expose carrying capacity, per-segment growth rates, and event coefficients with override sliders.",
+                    "Export fitted overlays, forward projections, and the growth equation for simulation.",
                 ],
             },
             {
                 "label": "Stage 5 — Diagnostics",
-                "status": "⚠️ Basic checks",
                 "details": [
-                    "Shows delta charts plus tail views with segment slope overlays and trailing-window metrics.",
-                    "Surfaces quick estimators, supports `phase1.json` download, and applies estimates to the Simulator sidebar.",
-                    "Full cross-validation remains on the roadmap.",
+                    "Review delta charts plus tail views with segment slope overlays and trailing-window metrics.",
+                    "Surface quick estimators, support `phase1.json` downloads, and apply estimates to the Simulator sidebar.",
                 ],
             },
         ],
@@ -142,30 +135,35 @@ STAGE_PHASES = [
     {
         "title": "Phase 2 — Simulation & outputs",
         "summary": (
-            "Stages 6–7 focus on forward planning. Today the app ships with the deterministic"
-            " cohort simulator and export tooling, with additional automation still planned."
+            "This phase lives on the Simulator and Save / Load tabs. It runs the deterministic cohort model and"
+            " packages results for planning or hand-off."
         ),
         "stages": [
             {
                 "label": "Stage 6 — Cohort & finance simulator",
-                "status": "✅ Implemented",
                 "details": [
-                    "Runs the deterministic free/paid cohort model with growth, churn, conversion, and ad-spend schedules.",
-                    "Outputs monthly KPIs, charts, ROAS/CAC/payback tiles, and a status recap of completed Phase 1 stages.",
-                    "Supports two-stage vs constant spend, manual overrides, and stateful save/load bundles.",
+                    "Run the deterministic free/paid cohort model with growth, churn, conversion, and ad-spend schedules.",
+                    "Output monthly KPIs, charts, ROAS/CAC/payback tiles, and apply completed Phase 1 stage results.",
+                    "Support two-stage versus constant spend, manual overrides, and stateful save/load bundles.",
                 ],
             },
             {
                 "label": "Stage 7 — Outputs & documentation",
-                "status": "⚠️ Partial",
                 "details": [
-                    "Exports `phase1.json` and full session bundles (.zip) plus CSV downloads for intermediate tables.",
-                    "Auto-generated reference docs remain on the long-term roadmap.",
+                    "Export `phase1.json` and full session bundles (.zip) plus CSV downloads for intermediate tables.",
+                    "Capture your current configuration for documentation or collaboration.",
                 ],
             },
         ],
     },
 ]
+
+DEFAULT_SIMULATOR_EQUATION_LATEX = (
+    r"F_t = F_{t-1}(1 - c_f) + F_{t-1}\,g + \frac{AdSpend_t}{CAC} - conv_t\\"
+    r"P_t = P_{t-1}(1 - c_p) + conv_t\\"
+    r"conv_t = (new^{free}_t)\,p_{new} + F_{t-1}\,p_{ongoing},\\"
+    r"\quad new^{free}_t = F_{t-1}\,g + \frac{AdSpend_t}{CAC}"
+)
 
 
 def _clean_events_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -1595,28 +1593,6 @@ def render_charts(df: pd.DataFrame) -> None:
     )
 
 
-def render_stages_tab() -> None:
-    st.subheader("Stage roadmap by phase")
-    st.caption("Snapshot of the product roadmap, grouped by Phase 1 (fit) and Phase 2 (simulation).")
-
-    total_phases = len(STAGE_PHASES)
-    for idx, phase in enumerate(STAGE_PHASES):
-        st.markdown(f"### {phase['title']}")
-        summary = phase.get("summary")
-        if summary:
-            st.caption(summary)
-
-        for stage in phase.get("stages", []):
-            st.markdown(f"**{stage['label']}** — {stage['status']}")
-            details = stage.get("details", [])
-            if details:
-                st.markdown("\n".join(f"- {item}" for item in details))
-            st.write("")
-
-        if idx < total_phases - 1:
-            st.markdown("---")
-
-
 def render_estimators() -> None:
     st.subheader("Quick estimators from your Substack stats")
 
@@ -1739,6 +1715,37 @@ def render_estimators() -> None:
 
 
 def render_help() -> None:
+    st.subheader("How the Substack Ads ROI Simulator works")
+    st.caption("Walk through each phase to see how data flows from import to simulation.")
+
+    total_phases = len(STAGE_PHASES)
+    for idx, phase in enumerate(STAGE_PHASES):
+        st.markdown(f"### {phase['title']}")
+        summary = phase.get("summary")
+        if summary:
+            st.markdown(summary)
+
+        for stage in phase.get("stages", []):
+            st.markdown(f"**{stage['label']}**")
+            details = stage.get("details", [])
+            if details:
+                st.markdown("\n".join(f"- {item}" for item in details))
+            st.write("")
+
+        if idx < total_phases - 1:
+            st.markdown("---")
+
+    st.markdown("---")
+    st.subheader("Growth equation")
+    equation = st.session_state.get("growth_equation_latex")
+    if equation:
+        st.latex(equation)
+        st.caption("Captured from the most recent fit on the Data Import tab.")
+    else:
+        st.latex(DEFAULT_SIMULATOR_EQUATION_LATEX)
+        st.caption("Default deterministic cohort equations used by the Simulator sidebar assumptions.")
+
+    st.markdown("---")
     st.subheader("How to map Substack stats to this simulator")
     st.markdown(
         """
@@ -2074,11 +2081,10 @@ render_brand_header()
 
 # Tabs
 with st.container():
-    tab_import, tab_sim, tab_stages, tab_est, tab_save, tab_help = st.tabs(
+    tab_import, tab_sim, tab_est, tab_save, tab_help = st.tabs(
         [
             "Data Import",
             "Simulator",
-            "Stages",
             "Estimators",
             "Save / Load",
             "Help",
@@ -2094,25 +2100,10 @@ with tab_sim:
     sim_df = result.monthly
     st.session_state["sim_df"] = sim_df
     st.subheader("Stage 7: Cohort & Finance Simulator")
-    # If available, show the growth equation selected on the data/fit tab
-    _eq = st.session_state.get("growth_equation_latex")
-    if _eq:
-        st.markdown("**Current growth equation**")
-        st.latex(_eq)
-    else:
-        # Fallback: show the simulator's MVP equations
-        st.markdown("**Current growth equation**")
-        eq_sim = (
-            r"F_t = F_{t-1}(1 - c_f) + F_{t-1}\,g + \frac{AdSpend_t}{CAC} - conv_t\\"
-            r"P_t = P_{t-1}(1 - c_p) + conv_t\\"
-            r"conv_t = (new^{free}_t)\,p_{new} + F_{t-1}\,p_{ongoing},\\"
-            r"\quad new^{free}_t = F_{t-1}\,g + \frac{AdSpend_t}{CAC}"
-        )
-        st.latex(eq_sim)
-
     st.info(
-        "Next: set sidebar assumptions (growth, churn, conversion, pricing, CAC, ad spend) and run the "
-        "Simulator to project subscribers, revenue, ROAS, and payback."
+        "Set sidebar assumptions (growth, churn, conversion, pricing, CAC, ad spend) and run the Simulator "
+        "to project subscribers, revenue, ROAS, and payback. The Help tab documents the workflow and "
+        "current growth equation."
     )
     with st.expander("Save / Load (quick access)", expanded=False):
         has_fit_q = st.session_state.get("pwlog_fit") is not None
@@ -2139,9 +2130,6 @@ with tab_sim:
     with st.expander("Monthly details", expanded=False):
         st.dataframe(sim_df, width="stretch")
     render_charts(sim_df)
-
-with tab_stages:
-    render_stages_tab()
 
 with tab_est:
     render_estimators()
