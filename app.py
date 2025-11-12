@@ -1513,7 +1513,7 @@ def sidebar_inputs() -> SimulationInputs:
     with st.sidebar.expander("Model fit parameters", expanded=True):
         fit = st.session_state.get("pwlog_fit")
         if fit is not None:
-            logger.debug(
+            logger.info(
                 "Rendering model fit parameters: carrying_capacity=%s, gamma_pulse=%s, gamma_step=%s, gamma_exog=%s",
                 getattr(fit, "carrying_capacity", None),
                 getattr(fit, "gamma_pulse", None),
@@ -1560,10 +1560,10 @@ def sidebar_inputs() -> SimulationInputs:
 
                 # Segment growth rates r_j
                 base_r_list = coerce_list(st.session_state.get("modelfit_r"))
-                logger.debug("Initial base_r_list from session state: %s", base_r_list)
+                logger.info("Initial base_r_list from session state: %s", base_r_list)
                 if not base_r_list:
                     base_r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
-                    logger.debug("Fallback base_r_list from fit: %s", base_r_list)
+                    logger.info("Fallback base_r_list from fit: %s", base_r_list)
             except Exception:
                 logger.exception("Model fit parameters available, but could not render editor. fit=%s", fit)
                 st.caption("Model fit parameters available, but could not render editor.")
