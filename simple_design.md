@@ -74,12 +74,11 @@ Where:
 **Inference options**
 
 - **Quick fit**: grid search over (K, \theta, \lambda); OLS for (r, \beta, \gamma).
-- **Bayesian fit**: priors on parameters; NUTS sampling in PyMC/Stan.
 
 **Outputs**
 
 - Fitted parameters.
-- Posterior predictive bands (if Bayesian).
+- Deterministic projections from the fitted parameters.
 
 ---
 
@@ -104,7 +103,7 @@ Where:
 
 ## Stage 5 — Implementation Notes
 
-- Dependencies: PyMC/Stan, ArviZ, pandas.
+- Dependencies: pandas and scientific Python stack.
 - Start with fixed (\lambda), grid search (K), log-form ads.
 - Weekly aggregation may help runtime.
 
