@@ -84,6 +84,98 @@ EVENT_TYPE_OPTIONS = [
 if "events_df" not in st.session_state:
     st.session_state["events_df"] = pd.DataFrame(columns=EVENTS_COLUMNS)
 
+STAGE_PHASES = [
+    {
+        "title": "Phase 1 — Fit & diagnostics",
+        "summary": (
+            "Stages 1–5 live on the Data Import tab. They clean the Substack exports,"
+            " annotate events, derive heuristic adds/churn, run the piecewise logistic fit,"
+            " and package a `phase1.json` handoff for Phase 2."
+        ),
+        "stages": [
+            {
+                "label": "Stage 1 — Import & normalization",
+                "status": "✅ Implemented",
+                "details": [
+                    "Uploads All and Paid subscriber exports (CSV/XLSX) with selectable columns.",
+                    "Resamples to month-end, derives Free = Total − Paid, and saves `observations_df` with download.",
+                    "Stores the cleaned table in session state for downstream stages and `phase1.json` exports.",
+                ],
+            },
+            {
+                "label": "Stage 2 — Events & features",
+                "status": "✅ Implemented",
+                "details": [
+                    "Editable event grid with change-point detection assists and cost/notes metadata.",
+                    "Builds `events_df`, `covariates_df`, and `features_df` using adstock + log response parameters from the sidebar.",
+                    "Supports importing/exporting `phase1.json` to hand off breakpoints, events, and ad spend.",
+                ],
+            },
+            {
+                "label": "Stage 3 — Adds & churn",
+                "status": "⚠️ MVP (heuristic path)",
+                "details": [
+                    "Derives monthly `adds_df` and `churn_df` from totals using user-supplied churn-rate estimates.",
+                    "Provides CSV downloads for both tables; latent adds/churn decomposition remains planned.",
+                ],
+            },
+            {
+                "label": "Stage 4 — Quick fit",
+                "status": "⚠️ MVP (piecewise logistic)",
+                "details": [
+                    "Fits a piecewise logistic model with detected breakpoints and optional ad-response regressor.",
+                    "Exposes carrying capacity, per-segment growth rates, and event coefficients with override sliders.",
+                    "Exports fitted overlays, optional forward projections, and the growth equation for Phase 2.",
+                ],
+            },
+            {
+                "label": "Stage 5 — Diagnostics",
+                "status": "⚠️ Basic checks",
+                "details": [
+                    "Shows delta charts plus tail views with segment slope overlays and trailing-window metrics.",
+                    "Surfaces quick estimators, supports `phase1.json` download, and applies estimates to the Simulator sidebar.",
+                    "Full cross-validation and posterior diagnostics are still on the roadmap.",
+                ],
+            },
+        ],
+    },
+    {
+        "title": "Phase 2 — Simulation & outputs",
+        "summary": (
+            "Stages 6–8 focus on forward planning. Today the app ships with the deterministic"
+            " cohort simulator (Stage 7) plus artifact exports; the posterior scenario engine"
+            " and documentation generator remain planned."
+        ),
+        "stages": [
+            {
+                "label": "Stage 6 — Posterior scenarios",
+                "status": "⏳ Planned",
+                "details": [
+                    "Will simulate from Bayesian posterior draws once the full state-space fit lands.",
+                    "Targets multi-scenario comparisons with capacity-aware constraints and uncertainty bands.",
+                ],
+            },
+            {
+                "label": "Stage 7 — Cohort & finance simulator",
+                "status": "✅ Implemented",
+                "details": [
+                    "Runs the deterministic free/paid cohort model with growth, churn, conversion, and ad-spend schedules.",
+                    "Outputs monthly KPIs, charts, ROAS/CAC/payback tiles, and a status recap of completed Phase 1 stages.",
+                    "Supports two-stage vs constant spend, manual overrides, and stateful save/load bundles.",
+                ],
+            },
+            {
+                "label": "Stage 8 — Outputs & documentation",
+                "status": "⚠️ Partial",
+                "details": [
+                    "Exports `phase1.json` and full session bundles (.zip) plus CSV downloads for intermediate tables.",
+                    "Auto-generated reference docs and posterior archives are slated for the Bayesian upgrade.",
+                ],
+            },
+        ],
+    },
+]
+
 
 def _clean_events_df(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize types without changing the date *month/day* a user entered."""
@@ -1499,6 +1591,28 @@ def render_charts(df: pd.DataFrame) -> None:
     )
 
 
+def render_stages_tab() -> None:
+    st.subheader("Stage roadmap by phase")
+    st.caption("Snapshot of the product roadmap, grouped by Phase 1 (fit) and Phase 2 (simulation).")
+
+    total_phases = len(STAGE_PHASES)
+    for idx, phase in enumerate(STAGE_PHASES):
+        st.markdown(f"### {phase['title']}")
+        summary = phase.get("summary")
+        if summary:
+            st.caption(summary)
+
+        for stage in phase.get("stages", []):
+            st.markdown(f"**{stage['label']}** — {stage['status']}")
+            details = stage.get("details", [])
+            if details:
+                st.markdown("\n".join(f"- {item}" for item in details))
+            st.write("")
+
+        if idx < total_phases - 1:
+            st.markdown("---")
+
+
 def render_estimators() -> None:
     st.subheader("Quick estimators from your Substack stats")
 
@@ -1956,10 +2070,11 @@ render_brand_header()
 
 # Tabs
 with st.container():
-    tab_import, tab_sim, tab_est, tab_save, tab_help = st.tabs(
+    tab_import, tab_sim, tab_stages, tab_est, tab_save, tab_help = st.tabs(
         [
             "Data Import",
             "Simulator",
+            "Stages",
             "Estimators",
             "Save / Load",
             "Help",
@@ -2069,6 +2184,9 @@ with tab_sim:
         "MVP model: instant conversion of a share of new free subs, small ongoing conversion of existing free base, "
         "and simple net revenue after Substack + Stripe fees."
     )
+
+with tab_stages:
+    render_stages_tab()
 
 with tab_est:
     render_estimators()
