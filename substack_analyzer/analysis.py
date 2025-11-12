@@ -233,7 +233,7 @@ def compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | Non
     - Only Paid provided: Returns `start_premium` from the last observation.
 
     Independently ensures churn defaults are present by reading
-    `churn_free` and `churn_prem` from `st.session_state` (default 0.01).
+    `churn_free` and `churn_prem` from `st.session_state`.
 
     Parameters
     ----------

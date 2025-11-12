@@ -17,7 +17,7 @@ import pandas as pd
 
 from substack_analyzer.analysis import compute_estimates
 from substack_analyzer.model import simulate_growth
-from substack_analyzer.types import AdSpendSchedule, SimulationInputs
+from substack_analyzer.types import DEFAULT_GROWTH_RATE, AdSpendSchedule, SimulationInputs
 
 coloredlogs.install(level="DEBUG")
 logger = logging.getLogger("substack_simulator")
@@ -118,7 +118,7 @@ def run(
     # Seed from estimates; allow scenario-only run even if sparse
     start_free = int(est.get("start_free", 0))
     start_premium = int(est.get("start_premium", 0))
-    organic_growth = float(est.get("organic_growth", 0.01))
+    organic_growth = float(est.get("organic_growth", DEFAULT_GROWTH_RATE))
     churn_free = float(est.get("churn_free", 0.0))
     churn_prem = float(est.get("churn_prem", 0.0))
     conv_ongoing = float(est.get("conv_ongoing", 0.0))

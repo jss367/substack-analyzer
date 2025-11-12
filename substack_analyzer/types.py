@@ -3,6 +3,9 @@ from typing import Any, Callable
 
 import pandas as pd
 
+# Default organic monthly growth rate used across the app when no estimate is available
+DEFAULT_GROWTH_RATE: float = 0.10
+
 
 @dataclass(frozen=True)
 class PiecewiseLogisticFit:
@@ -78,7 +81,7 @@ class SimulationInputs:
     horizon_months: int = 60
 
     # Growth and churn
-    organic_monthly_growth_rate: float = 0.01  # 1%
+    organic_monthly_growth_rate: float = DEFAULT_GROWTH_RATE
     monthly_churn_rate_free: float = 0.01  # 1%
     monthly_churn_rate_premium: float = 0.01  # 1%
 

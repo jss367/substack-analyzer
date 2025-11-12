@@ -21,7 +21,7 @@ from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_
 from substack_analyzer.detection import compute_segment_slopes, detect_change_points
 from substack_analyzer.model import simulate_growth
 from substack_analyzer.persistence import apply_session_bundle, collect_session_bundle
-from substack_analyzer.types import AdSpendSchedule, SimulationInputs
+from substack_analyzer.types import DEFAULT_GROWTH_RATE, AdSpendSchedule, SimulationInputs
 
 VISUALIZE = os.getenv("E2E_VISUALIZE", "1") != "0"
 
@@ -167,7 +167,7 @@ def main() -> None:
         starting_premium_subscribers=int(est.get("start_premium", 80)),
         carrying_capacity=getattr(fit, "carrying_capacity", None),
         horizon_months=24,
-        organic_monthly_growth_rate=float(est.get("organic_growth", 0.01)),
+        organic_monthly_growth_rate=float(est.get("organic_growth", DEFAULT_GROWTH_RATE)),
         ongoing_premium_conv_rate=0.0003,
         new_subscriber_premium_conv_rate=0.02,
         monthly_churn_rate_free=float(est.get("churn_free", 0.01)),

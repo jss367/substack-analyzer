@@ -38,7 +38,7 @@ from substack_analyzer.persistence import (
     collect_session_bundle,
     export_phase_one_json,
 )
-from substack_analyzer.types import AdSpendSchedule, SimulationInputs
+from substack_analyzer.types import DEFAULT_GROWTH_RATE, AdSpendSchedule, SimulationInputs
 from substack_analyzer.ui import format_currency as ui_format_currency
 from substack_analyzer.ui import format_date_badges as ui_format_date_badges
 from substack_analyzer.ui import inject_brand_styles as ui_inject_brand_styles
@@ -1354,7 +1354,7 @@ def sidebar_inputs() -> SimulationInputs:
             "Organic monthly growth (free)",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(_get_state("organic_growth", 0.01)),
+            default_value=float(_get_state("organic_growth", DEFAULT_GROWTH_RATE)),
             step=0.001,
             format="%0.3f",
             key="organic_growth",
@@ -1591,9 +1591,9 @@ def sidebar_inputs() -> SimulationInputs:
         if fit is None:
             base_r_list = coerce_list(st.session_state.get("modelfit_r"))
         if not base_r_list:
-            base_r_list = [_safe_float(_get_state("organic_growth", 0.01), 0.01)]
+            base_r_list = [_safe_float(_get_state("organic_growth", DEFAULT_GROWTH_RATE), DEFAULT_GROWTH_RATE)]
 
-        organic_default = _safe_float(_get_state("organic_growth", 0.01), 0.01)
+        organic_default = _safe_float(_get_state("organic_growth", DEFAULT_GROWTH_RATE), DEFAULT_GROWTH_RATE)
         base_r_list = [_safe_float(val, organic_default) for val in coerce_list(base_r_list)]
 
         # Remove legacy per-segment widget keys to avoid stale values lingering in state
