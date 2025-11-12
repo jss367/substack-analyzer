@@ -134,7 +134,7 @@ STAGE_PHASES = [
                 "details": [
                     "Shows delta charts plus tail views with segment slope overlays and trailing-window metrics.",
                     "Surfaces quick estimators, supports `phase1.json` download, and applies estimates to the Simulator sidebar.",
-                    "Full cross-validation and posterior diagnostics are still on the roadmap.",
+                    "Full cross-validation remains on the roadmap.",
                 ],
             },
         ],
@@ -142,21 +142,12 @@ STAGE_PHASES = [
     {
         "title": "Phase 2 — Simulation & outputs",
         "summary": (
-            "Stages 6–8 focus on forward planning. Today the app ships with the deterministic"
-            " cohort simulator (Stage 7) plus artifact exports; the posterior scenario engine"
-            " and documentation generator remain planned."
+            "Stages 6–7 focus on forward planning. Today the app ships with the deterministic"
+            " cohort simulator and export tooling, with additional automation still planned."
         ),
         "stages": [
             {
-                "label": "Stage 6 — Posterior scenarios",
-                "status": "⏳ Planned",
-                "details": [
-                    "Will simulate from Bayesian posterior draws once the full state-space fit lands.",
-                    "Targets multi-scenario comparisons with capacity-aware constraints and uncertainty bands.",
-                ],
-            },
-            {
-                "label": "Stage 7 — Cohort & finance simulator",
+                "label": "Stage 6 — Cohort & finance simulator",
                 "status": "✅ Implemented",
                 "details": [
                     "Runs the deterministic free/paid cohort model with growth, churn, conversion, and ad-spend schedules.",
@@ -165,11 +156,11 @@ STAGE_PHASES = [
                 ],
             },
             {
-                "label": "Stage 8 — Outputs & documentation",
+                "label": "Stage 7 — Outputs & documentation",
                 "status": "⚠️ Partial",
                 "details": [
                     "Exports `phase1.json` and full session bundles (.zip) plus CSV downloads for intermediate tables.",
-                    "Auto-generated reference docs and posterior archives are slated for the Bayesian upgrade.",
+                    "Auto-generated reference docs remain on the long-term roadmap.",
                 ],
             },
         ],
