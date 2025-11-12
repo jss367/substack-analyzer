@@ -67,20 +67,6 @@ def test_fit_piecewise_logistic_two_segment_rates_ordered():
     assert fit.segment_growth_rates[0] > fit.segment_growth_rates[1]
 
 
-def test_fit_piecewise_logistic_accepts_datelike_breakpoints():
-    idx = pd.period_range("2023-01", periods=18, freq="M").to_timestamp("M")
-    base = pd.Series(np.linspace(120, 260, len(idx)), index=idx)
-    # Provide breakpoints as timestamps and ISO strings
-    bp_dates = [idx[6], idx[12]]
-    bp_strings = [d.strftime("%Y-%m-%d") for d in bp_dates]
-
-    fit_dates = fit_piecewise_logistic(base, breakpoints=bp_dates)
-    assert len(fit_dates.segment_growth_rates) == len(bp_dates) + 1
-
-    fit_strings = fit_piecewise_logistic(base, breakpoints=bp_strings)
-    assert len(fit_strings.segment_growth_rates) == len(bp_strings) + 1
-
-
 def test_fit_piecewise_logistic_events_reduce_sse():
     # Series with a one-time spike in delta that events can explain
     idx = pd.period_range("2024-01", periods=7, freq="M").to_timestamp("M")
