@@ -953,10 +953,18 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 st.session_state["modelfit_gamma_step"] = float(getattr(fit, "gamma_step", 0.0) or 0.0)
             if getattr(fit, "gamma_exog", None) is not None and "modelfit_gamma_exog" not in st.session_state:
                 st.session_state["modelfit_gamma_exog"] = float(getattr(fit, "gamma_exog", 0.0))
-            if "modelfit_r" not in st.session_state:
-                st.session_state["modelfit_r"] = coerce_list(getattr(fit, "segment_growth_rates", None))
-            if "modelfit_intercepts" not in st.session_state:
-                st.session_state["modelfit_intercepts"] = coerce_list(getattr(fit, "segment_intercepts", None))
+            fit_r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
+            fit_intercepts = coerce_list(getattr(fit, "segment_intercepts", None))
+
+            existing_r = coerce_list(st.session_state.get("modelfit_r"))
+            if ("modelfit_r" not in st.session_state) or (len(existing_r) != len(fit_r_list)):
+                st.session_state["modelfit_r"] = fit_r_list
+
+            existing_intercepts = coerce_list(st.session_state.get("modelfit_intercepts"))
+            if ("modelfit_intercepts" not in st.session_state) or (
+                len(existing_intercepts) != len(fit_intercepts)
+            ):
+                st.session_state["modelfit_intercepts"] = fit_intercepts
 
             # ----- read current overrides & recompute fitted line with them -----
             def _current_fit_params():
