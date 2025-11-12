@@ -1,4 +1,5 @@
 import math
+import numbers
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -984,9 +985,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 st.session_state.pop("modelfit_r_last_input", None)
 
             existing_intercepts = coerce_list(st.session_state.get("modelfit_intercepts"))
-            if ("modelfit_intercepts" not in st.session_state) or (
-                len(existing_intercepts) != len(fit_intercepts)
-            ):
+            if ("modelfit_intercepts" not in st.session_state) or (len(existing_intercepts) != len(fit_intercepts)):
                 st.session_state["modelfit_intercepts"] = fit_intercepts
 
             # ----- read current overrides & recompute fitted line with them -----
@@ -1272,6 +1271,26 @@ def metrics_and_apply_ui(all_series: pd.Series | None, paid_series: pd.Series | 
 
 def number_input_state(label: str, *, key: str, default_value, **kwargs):
     kwargs["key"] = key
+
+    def _is_number(value: Any) -> bool:
+        return isinstance(value, numbers.Number)
+
+    current_value = st.session_state.get(key, default_value)
+
+    min_value = kwargs.get("min_value")
+    if min_value is not None:
+        candidates = [min_value, default_value, current_value]
+        numeric_candidates = [val for val in candidates if _is_number(val)]
+        if numeric_candidates:
+            kwargs["min_value"] = min(numeric_candidates)
+
+    max_value = kwargs.get("max_value")
+    if max_value is not None:
+        candidates = [max_value, default_value, current_value]
+        numeric_candidates = [val for val in candidates if _is_number(val)]
+        if numeric_candidates:
+            kwargs["max_value"] = max(numeric_candidates)
+
     if key not in st.session_state:
         kwargs["value"] = default_value
     return st.number_input(label, **kwargs)
@@ -1422,8 +1441,7 @@ def sidebar_inputs() -> SimulationInputs:
             candidates = [0, 11, 23, 35, 59, horizon_idx]
             preview_months = sorted({min(max(m, 0), horizon_idx) for m in candidates})
             preview_rows = {
-                f"Month {m + 1}": format_currency(float(ad_schedule.get_spend_for_month(m)))
-                for m in preview_months
+                f"Month {m + 1}": format_currency(float(ad_schedule.get_spend_for_month(m))) for m in preview_months
             }
             st.write("Representative monthly ad spend:", preview_rows)
 
@@ -1521,7 +1539,9 @@ def sidebar_inputs() -> SimulationInputs:
                 getattr(fit, "gamma_exog", None),
             )
         if fit is None:
-            st.caption("No model fit available yet. Run Model fit on the Estimators tab or edit r below for simulations.")
+            st.caption(
+                "No model fit available yet. Run Model fit on the Estimators tab or edit r below for simulations."
+            )
         else:
             try:
                 k_val = number_input_state(
@@ -1588,10 +1608,7 @@ def sidebar_inputs() -> SimulationInputs:
 
         last_segment_default = float(base_r_list[-1] if base_r_list else organic_default)
         last_default = st.session_state.get("modelfit_r_last_default")
-        if (
-            last_default is None
-            or not math.isclose(last_default, last_segment_default, rel_tol=1e-9, abs_tol=1e-9)
-        ):
+        if last_default is None or not math.isclose(last_default, last_segment_default, rel_tol=1e-9, abs_tol=1e-9):
             st.session_state["modelfit_r_last_default"] = last_segment_default
             st.session_state.pop("modelfit_r_last_input", None)
         last_r_val = number_input_state(
