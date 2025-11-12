@@ -1,3 +1,5 @@
+from contextlib import suppress
+from datetime import date, datetime
 from typing import Sequence
 
 import numpy as np
@@ -5,6 +7,75 @@ import pandas as pd
 
 from substack_analyzer.types import PiecewiseLogisticFit
 from substack_analyzer.utils import ensure_month_end_index
+
+
+def _normalize_breakpoints(
+    breakpoints: Sequence[object] | None, index: pd.DatetimeIndex
+) -> list[int]:
+    """Return sorted, unique breakpoint indices aligned to ``index``.
+
+    ``breakpoints`` may include integers, floats (interpreted as month indices),
+    or datelike values (``Timestamp``/``datetime``/``date``/ISO strings).
+    Values outside ``[1, len(index) - 2]`` are ignored so that each resulting
+    segment contains at least one delta observation.
+    """
+
+    if not breakpoints:
+        return []
+
+    max_valid = max(len(index) - 2, 0)
+    cleaned: list[int] = []
+
+    def _append_if_valid(val: int) -> None:
+        if 1 <= val <= max_valid:
+            cleaned.append(val)
+
+    for raw in breakpoints:
+        if raw is None:
+            continue
+
+        # --- Direct integers (or numpy scalar ints) ---
+        if isinstance(raw, (int, np.integer)):
+            _append_if_valid(int(raw))
+            continue
+
+        # --- Floats that represent integral positions ---
+        if isinstance(raw, (float, np.floating)):
+            if np.isfinite(raw):
+                _append_if_valid(int(round(raw)))
+            continue
+
+        # --- Datelike objects (datetime/date/Timestamp) ---
+        if isinstance(raw, (pd.Timestamp, datetime, date)):
+            ts = pd.to_datetime(raw).to_period("M").to_timestamp("M")
+            loc = index.get_indexer([ts])
+            if loc.size and loc[0] != -1:
+                _append_if_valid(int(loc[0]))
+            continue
+
+        # --- Strings: try numeric first, then parse as date ---
+        if isinstance(raw, str):
+            text = raw.strip()
+            if not text:
+                continue
+            try:
+                _append_if_valid(int(text))
+                continue
+            except ValueError:
+                with suppress(ValueError):
+                    num_val = float(text)
+                    if np.isfinite(num_val):
+                        _append_if_valid(int(round(num_val)))
+                        continue
+                ts = pd.to_datetime(text, errors="coerce")
+                if pd.notna(ts):
+                    ts = ts.to_period("M").to_timestamp("M")
+                    loc = index.get_indexer([ts])
+                    if loc.size and loc[0] != -1:
+                        _append_if_valid(int(loc[0]))
+            continue
+
+    return sorted(set(cleaned))
 
 
 def _segments_from_breakpoints(n: int, breakpoints: Sequence[int]) -> list[tuple[int, int]]:
@@ -108,7 +179,7 @@ def fit_piecewise_logistic(
     # Build segments on the index of y (which starts at original index[1])
     # Sanitize breakpoints relative to original series length (len(input_series))
     n_series = len(input_series)
-    bps = sorted({int(b) for b in breakpoints if 1 <= int(b) <= n_series - 2}) if breakpoints else []
+    bps = _normalize_breakpoints(breakpoints, input_series.index)
     seg_bounds = _segments_from_breakpoints(n_series, bps)
     num_segments = len(seg_bounds)
 
@@ -351,10 +422,7 @@ def fitted_series_from_params(
 
     # Sanitise breakpoints in the same manner as the fitter
     n_series = len(s)
-    if breakpoints:
-        bps = sorted({int(b) for b in breakpoints if 1 <= int(b) <= max(n_series - 2, 1)})
-    else:
-        bps = []
+    bps = _normalize_breakpoints(breakpoints, s.index)
 
     # Segment bounds on the original series index
     seg_bounds = _segments_from_breakpoints(n_series, bps)
