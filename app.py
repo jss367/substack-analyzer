@@ -973,9 +973,15 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if ("modelfit_r" not in st.session_state) or (len(existing_r) != len(fit_r_list)):
                 st.session_state["modelfit_r"] = fit_r_list
                 if fit_r_list:
-                    st.session_state["modelfit_r_last"] = _safe_float(fit_r_list[-1], 0.0)
-            elif ("modelfit_r_last" not in st.session_state) and existing_r:
-                st.session_state["modelfit_r_last"] = _safe_float(existing_r[-1], 0.0)
+                    last_fit_r = _safe_float(fit_r_list[-1], 0.0)
+                    st.session_state["modelfit_r_last_value"] = last_fit_r
+                    st.session_state["modelfit_r_last_default"] = last_fit_r
+                    st.session_state.pop("modelfit_r_last_input", None)
+            elif ("modelfit_r_last_value" not in st.session_state) and existing_r:
+                last_existing_r = _safe_float(existing_r[-1], 0.0)
+                st.session_state["modelfit_r_last_value"] = last_existing_r
+                st.session_state["modelfit_r_last_default"] = last_existing_r
+                st.session_state.pop("modelfit_r_last_input", None)
 
             existing_intercepts = coerce_list(st.session_state.get("modelfit_intercepts"))
             if ("modelfit_intercepts" not in st.session_state) or (
@@ -1560,18 +1566,30 @@ def sidebar_inputs() -> SimulationInputs:
         base_r_list = [_safe_float(val, organic_default) for val in coerce_list(base_r_list)]
 
         # Remove legacy per-segment widget keys to avoid stale values lingering in state
+        preserved_r_keys = {
+            "modelfit_r_last_input",
+            "modelfit_r_last_value",
+            "modelfit_r_last_default",
+        }
         for key in list(st.session_state.keys()):
-            if key.startswith("modelfit_r_"):
+            if key.startswith("modelfit_r_") and key not in preserved_r_keys:
                 del st.session_state[key]
 
-        last_segment_default = base_r_list[-1] if base_r_list else organic_default
+        last_segment_default = float(base_r_list[-1] if base_r_list else organic_default)
+        last_default = st.session_state.get("modelfit_r_last_default")
+        if (
+            last_default is None
+            or not math.isclose(last_default, last_segment_default, rel_tol=1e-9, abs_tol=1e-9)
+        ):
+            st.session_state["modelfit_r_last_default"] = last_segment_default
+            st.session_state.pop("modelfit_r_last_input", None)
         last_r_val = number_input_state(
             "Last segment growth rate (r)",
             min_value=-10.0,
             max_value=10.0,
             default_value=last_segment_default,
             step=0.001,
-            key="modelfit_r_last",
+            key="modelfit_r_last_input",
         )
 
         if base_r_list:
@@ -1583,7 +1601,9 @@ def sidebar_inputs() -> SimulationInputs:
         # Persist aggregate list (non-widget key) for convenience
         st.session_state["modelfit_r"] = r_over
         if r_over:
-            st.session_state["modelfit_r_last"] = float(r_over[-1])
+            last_value = float(r_over[-1])
+            st.session_state["modelfit_r_last_value"] = last_value
+            st.session_state["modelfit_r_last_default"] = last_value
 
     # Map model-fit overrides into simulator: use last segment r as organic growth if available
     _k_now, _r_now, _gp_now, _gs_now, _gx_now = _current_fit_params()
