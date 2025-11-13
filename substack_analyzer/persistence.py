@@ -60,6 +60,8 @@ def collect_session_bundle(include_fit: bool, include_sim: bool) -> bytes:
             "ad_stage1",
             "ad_stage2",
             "ad_const",
+            "ad_one_time_amount",
+            "ad_one_time_month",
             "est_window",
             "max_changes_detect",
         ]
