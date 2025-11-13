@@ -982,19 +982,22 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     last_fit_r = _safe_float(fit_r_list[-1], 0.0)
                     st.session_state["modelfit_r_last_value"] = last_fit_r
                     st.session_state["modelfit_r_last_default"] = last_fit_r
-                    logger.info(
-                        "Clearing last segment widget state after fit init; new default=%s",
-                        last_fit_r,
-                    )
+                    if "modelfit_r_last_input" in st.session_state:
+                        logger.info(
+                            "Dropping modelfit_r_last_input after refitting; last_fit_r=%s",
+                            last_fit_r,
+                        )
                     st.session_state.pop("modelfit_r_last_input", None)
             elif ("modelfit_r_last_value" not in st.session_state) and existing_r:
                 last_existing_r = _safe_float(existing_r[-1], 0.0)
                 st.session_state["modelfit_r_last_value"] = last_existing_r
                 st.session_state["modelfit_r_last_default"] = last_existing_r
-                logger.info(
-                    "Seeding last segment widget state from existing overrides; default=%s",
-                    last_existing_r,
-                )
+                if "modelfit_r_last_input" in st.session_state:
+                    logger.info(
+                        "Dropping modelfit_r_last_input while seeding from existing_r; "
+                        "last_existing_r=%s",
+                        last_existing_r,
+                    )
                 st.session_state.pop("modelfit_r_last_input", None)
 
             existing_intercepts = coerce_list(st.session_state.get("modelfit_intercepts"))
@@ -1621,35 +1624,25 @@ def sidebar_inputs() -> SimulationInputs:
 
         last_segment_default = float(base_r_list[-1] if base_r_list else organic_default)
         last_default = st.session_state.get("modelfit_r_last_default")
-        reset_last_input = False
-        if last_default is None:
-            logger.info(
-                "No stored last segment default; resetting widget state to computed default=%s",
-                last_segment_default,
-            )
-            reset_last_input = True
-        else:
-            defaults_match = math.isclose(
-                last_default,
-                last_segment_default,
-                rel_tol=1e-9,
-                abs_tol=1e-9,
-            )
-            if not defaults_match:
+        if last_default is None or not math.isclose(
+            last_default,
+            last_segment_default,
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        ):
+            if last_default is None:
                 logger.info(
-                    "Last segment default drift detected; stored=%s computed=%s abs_diff=%s. Clearing widget state.",
-                    last_default,
+                    "Resetting last segment input because no stored default exists; "
+                    "computed_default=%s",
                     last_segment_default,
-                    abs(last_default - last_segment_default),
                 )
-                reset_last_input = True
             else:
-                logger.debug(
-                    "Last segment default %s matches computed %s within tolerance; preserving widget state.",
+                logger.info(
+                    "Resetting last segment input due to default drift; "
+                    "stored_default=%s, computed_default=%s",
                     last_default,
                     last_segment_default,
                 )
-        if reset_last_input:
             st.session_state["modelfit_r_last_default"] = last_segment_default
             st.session_state.pop("modelfit_r_last_input", None)
         last_r_val = number_input_state(
