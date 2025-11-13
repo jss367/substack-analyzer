@@ -990,6 +990,11 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                             last_fit_r,
                             st.session_state.get("modelfit_r_last_input"),
                         )
+                    else:
+                        logger.info(
+                            "No stored modelfit_r_last_input to drop after refit; last_fit_r=%s",
+                            last_fit_r,
+                        )
                     st.session_state.pop("modelfit_r_last_input", None)
             elif ("modelfit_r_last_value" not in st.session_state) and existing_r:
                 last_existing_r = _safe_float(existing_r[-1], 0.0)
@@ -1001,6 +1006,12 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                         "last_existing_r=%s, previous_widget=%s",
                         last_existing_r,
                         st.session_state.get("modelfit_r_last_input"),
+                    )
+                else:
+                    logger.info(
+                        "No stored modelfit_r_last_input while seeding existing_r; "
+                        "last_existing_r=%s",
+                        last_existing_r,
                     )
                 st.session_state.pop("modelfit_r_last_input", None)
 
@@ -1304,6 +1315,17 @@ def number_input_state(label: str, *, key: str, default_value, **kwargs):
             default_value,
             key in st.session_state,
         )
+        if key in st.session_state:
+            logger.info(
+                "Last segment widget reusing stored session value; stored=%s, default=%s",
+                current_value,
+                default_value,
+            )
+        else:
+            logger.info(
+                "Last segment widget seeding from default; default=%s",
+                default_value,
+            )
 
     if "format" not in kwargs:
         step = kwargs.get("step")
