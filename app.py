@@ -988,6 +988,11 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                             "Dropping modelfit_r_last_input after refitting; last_fit_r=%s",
                             last_fit_r,
                         )
+                    else:
+                        logger.info(
+                            "No stored modelfit_r_last_input to drop after refit; last_fit_r=%s",
+                            last_fit_r,
+                        )
                     st.session_state.pop("modelfit_r_last_input", None)
             elif ("modelfit_r_last_value" not in st.session_state) and existing_r:
                 last_existing_r = _safe_float(existing_r[-1], 0.0)
@@ -996,6 +1001,12 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 if "modelfit_r_last_input" in st.session_state:
                     logger.info(
                         "Dropping modelfit_r_last_input while seeding from existing_r; "
+                        "last_existing_r=%s",
+                        last_existing_r,
+                    )
+                else:
+                    logger.info(
+                        "No stored modelfit_r_last_input while seeding existing_r; "
                         "last_existing_r=%s",
                         last_existing_r,
                     )
@@ -1293,6 +1304,18 @@ def number_input_state(label: str, *, key: str, default_value, **kwargs):
         return isinstance(value, numbers.Number)
 
     current_value = st.session_state.get(key, default_value)
+    if key == "modelfit_r_last_input":
+        if key in st.session_state:
+            logger.info(
+                "Last segment widget reusing stored session value; stored=%s, default=%s",
+                current_value,
+                default_value,
+            )
+        else:
+            logger.info(
+                "Last segment widget seeding from default; default=%s",
+                default_value,
+            )
 
     if "format" not in kwargs:
         step = kwargs.get("step")
