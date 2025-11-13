@@ -1284,6 +1284,8 @@ def metrics_and_apply_ui(all_series: pd.Series | None, paid_series: pd.Series | 
         st.session_state["ad_stage1"] = 0.0
         st.session_state["ad_stage2"] = 0.0
         st.session_state["ad_const"] = 0.0
+        st.session_state["ad_one_time_amount"] = 0.0
+        st.session_state["ad_one_time_month"] = 1
         st.session_state["spend_mode_index"] = 1
         st.session_state["conv_new"] = 0.0
         st.session_state["horizon_months"] = max(int(_get_state("horizon_months", 60)), 24)
@@ -1458,12 +1460,16 @@ def sidebar_inputs() -> SimulationInputs:
         )
 
     with st.sidebar.expander("Acquisition", expanded=True):
+        spend_mode_options = ["Two-stage (Years 1-2 / 3-5)", "Constant", "One-time"]
+        spend_mode_index = int(_get_state("spend_mode_index", 1))
+        spend_mode_index = max(0, min(spend_mode_index, len(spend_mode_options) - 1))
         spend_mode = st.selectbox(
             "Ad spend schedule",
-            ["Two-stage (Years 1-2 / 3-5)", "Constant"],
-            index=int(_get_state("spend_mode_index", 1)),
+            spend_mode_options,
+            index=spend_mode_index,
             key="spend_mode",
         )
+        one_time_trigger_idx = None
         if spend_mode.startswith("Two-stage"):
             stage1 = number_input_state(
                 "Monthly ad spend (years 1-2)",
@@ -1483,7 +1489,7 @@ def sidebar_inputs() -> SimulationInputs:
             stage2 = float(stage2 or 0.0)
             ad_schedule = AdSpendSchedule.two_stage(stage1, stage2)
             st.session_state["spend_mode_index"] = 0
-        else:
+        elif spend_mode == "Constant":
             const_spend = number_input_state(
                 "Monthly ad spend (constant)",
                 min_value=0.0,
@@ -1494,11 +1500,39 @@ def sidebar_inputs() -> SimulationInputs:
             const_spend = float(const_spend or 0.0)
             ad_schedule = AdSpendSchedule.constant(const_spend)
             st.session_state["spend_mode_index"] = 1
+        else:
+            one_time_amount = number_input_state(
+                "One-time ad spend amount",
+                min_value=0.0,
+                default_value=float(_get_state("ad_one_time_amount", 0.0)),
+                step=50.0,
+                key="ad_one_time_amount",
+            )
+            default_month = int(_get_state("ad_one_time_month", 1))
+            horizon_int = max(int(horizon), 1)
+            default_month = min(max(default_month, 1), horizon_int)
+            one_time_month = number_input_state(
+                "One-time spend month",
+                min_value=1,
+                max_value=horizon_int,
+                default_value=default_month,
+                step=1,
+                key="ad_one_time_month",
+            )
+            one_time_amount = float(one_time_amount or 0.0)
+            one_time_trigger_idx = max(int(one_time_month or 1) - 1, 0)
+            ad_schedule = AdSpendSchedule.one_time(one_time_amount, one_time_trigger_idx)
+            st.session_state["spend_mode_index"] = 2
 
         with st.sidebar.expander("Ad spend preview", expanded=False):
             horizon_idx = max(int(horizon) - 1, 0)
             candidates = [0, 11, 23, 35, 59, horizon_idx]
             preview_months = sorted({min(max(m, 0), horizon_idx) for m in candidates})
+            if one_time_trigger_idx is not None and horizon_idx >= 0:
+                preview_months = sorted(
+                    set(preview_months)
+                    | {min(max(one_time_trigger_idx, 0), horizon_idx)}
+                )
             preview_rows = {
                 f"Month {m + 1}": format_currency(float(ad_schedule.get_spend_for_month(m))) for m in preview_months
             }
