@@ -1655,6 +1655,12 @@ def sidebar_inputs() -> SimulationInputs:
                 )
             st.session_state["modelfit_r_last_default"] = last_segment_default
             st.session_state.pop("modelfit_r_last_input", None)
+        logger.info(
+            "Last-segment r defaults: computed=%s, stored=%s, widget_state=%s",
+            last_segment_default,
+            st.session_state.get("modelfit_r_last_default"),
+            st.session_state.get("modelfit_r_last_input"),
+        )
         last_r_val = number_input_state(
             "Last segment growth rate (r)",
             min_value=-10.0,
@@ -1663,6 +1669,8 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.001,
             key="modelfit_r_last_input",
         )
+
+        logger.info("Last-segment r widget returned %s", last_r_val)
 
         if base_r_list:
             r_over = list(base_r_list)
