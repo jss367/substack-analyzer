@@ -2,6 +2,7 @@ import math
 import numbers
 from contextlib import suppress
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -1292,6 +1293,15 @@ def number_input_state(label: str, *, key: str, default_value, **kwargs):
         return isinstance(value, numbers.Number)
 
     current_value = st.session_state.get(key, default_value)
+
+    if "format" not in kwargs:
+        step = kwargs.get("step")
+        decimals = 0
+        if isinstance(step, numbers.Real):
+            with suppress(Exception):
+                decimals = max(-Decimal(str(step)).as_tuple().exponent, 0)
+        if decimals > 0:
+            kwargs["format"] = f"%0.{decimals}f"
 
     min_value = kwargs.get("min_value")
     if min_value is not None:
