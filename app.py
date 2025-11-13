@@ -1067,7 +1067,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 .mark_line(strokeDash=[5, 3])
                 .encode(y="Value:Q", color=alt.Color("Series:N", scale=alt.Scale(range=["#ff7f0e"])))
             )
-            st.altair_chart(alt.layer(actual_line, fitted_line).properties(height=240), use_container_width=True)
+            st.altair_chart(alt.layer(actual_line, fitted_line).properties(height=240), width='stretch')
 
             # ----- metrics -----
             c1, c2, c3 = st.columns(3)
@@ -1132,7 +1132,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     )
                     .properties(height=240)
                 )
-                st.altair_chart(chart_fc, use_container_width=True)
+                st.altair_chart(chart_fc, width='stretch')
 
         except Exception as e:
             logger.exception("Model fit failed")
@@ -1218,7 +1218,7 @@ def tail_view_ui(
                 )
                 base_chart = alt.layer(base_chart, fit_t).resolve_scale(y="independent").properties(height=240)
 
-    st.altair_chart(base_chart, use_container_width=True)
+    st.altair_chart(base_chart, width='stretch')
 
 
 def metrics_and_apply_ui(all_series: pd.Series | None, paid_series: pd.Series | None, net_only: bool) -> None:
@@ -2101,7 +2101,7 @@ def _ui_series_chart(plot_df: pd.DataFrame) -> tuple[bool, bool]:
     base = plot_series(plot_df, use_dual_axis=use_dual_axis, show_total=show_total, series_title=series_title)
     event_rules = _event_rules_from_events() if st.session_state.get("markers_source", "events") == "events" else None
     chart = alt.layer(base, event_rules) if event_rules is not None else base
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width='stretch')
     return use_dual_axis, show_total
 
 
