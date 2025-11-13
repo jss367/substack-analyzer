@@ -985,8 +985,10 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     st.session_state["modelfit_r_last_default"] = last_fit_r
                     if "modelfit_r_last_input" in st.session_state:
                         logger.info(
-                            "Dropping modelfit_r_last_input after refitting; last_fit_r=%s",
+                            "Dropping modelfit_r_last_input after refitting; "
+                            "last_fit_r=%s, previous_widget=%s",
                             last_fit_r,
+                            st.session_state.get("modelfit_r_last_input"),
                         )
                     else:
                         logger.info(
@@ -1001,8 +1003,9 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 if "modelfit_r_last_input" in st.session_state:
                     logger.info(
                         "Dropping modelfit_r_last_input while seeding from existing_r; "
-                        "last_existing_r=%s",
+                        "last_existing_r=%s, previous_widget=%s",
                         last_existing_r,
+                        st.session_state.get("modelfit_r_last_input"),
                     )
                 else:
                     logger.info(
@@ -1305,6 +1308,13 @@ def number_input_state(label: str, *, key: str, default_value, **kwargs):
 
     current_value = st.session_state.get(key, default_value)
     if key == "modelfit_r_last_input":
+        logger.info(
+            "number_input_state for %s: stored_value=%s, default_value=%s, key_present=%s",
+            key,
+            current_value,
+            default_value,
+            key in st.session_state,
+        )
         if key in st.session_state:
             logger.info(
                 "Last segment widget reusing stored session value; stored=%s, default=%s",
