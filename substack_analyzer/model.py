@@ -82,18 +82,29 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
         if carrying_capacity > 0:
             capacity_multiplier = max(0.0, 1.0 - total_after_churn / carrying_capacity)
 
-        # Organic growth
+        # Organic growth (before capacity adjustment)
         new_free_organic_raw = free_subs * input_params.organic_monthly_growth_rate
-        new_free_organic = new_free_organic_raw * capacity_multiplier
 
-        # Paid acquisition
+        # Paid acquisition (before capacity adjustment)
         ad_spend = float(input_params.ad_spend_schedule.get_spend_for_month(m))
         paid_new = (
             0.0
             if input_params.cost_per_new_free_subscriber <= 0
             else ad_spend / input_params.cost_per_new_free_subscriber
         )
-        new_free_paid = paid_new * capacity_multiplier
+
+        # Apply capacity adjustment while ensuring churn replacement near the ceiling
+        new_free_raw_total = new_free_organic_raw + paid_new
+        overall_multiplier = 1.0 if new_free_raw_total > 0 else 0.0
+        if carrying_capacity > 0 and new_free_raw_total > 0:
+            capacity_gap = max(0.0, carrying_capacity - total_after_churn)
+            base_fill = min(new_free_raw_total, capacity_gap)
+            excess_new = new_free_raw_total - base_fill
+            adjusted_total_new = base_fill + excess_new * capacity_multiplier
+            overall_multiplier = adjusted_total_new / new_free_raw_total if new_free_raw_total > 0 else 0.0
+
+        new_free_organic = new_free_organic_raw * overall_multiplier
+        new_free_paid = paid_new * overall_multiplier
 
         # Add new free
         new_free_total = new_free_organic + new_free_paid
