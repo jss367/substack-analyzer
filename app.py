@@ -1666,6 +1666,18 @@ def sidebar_inputs() -> SimulationInputs:
             last_value = float(r_over[-1])
             st.session_state["modelfit_r_last_value"] = last_value
             st.session_state["modelfit_r_last_default"] = last_value
+            prev_logged = st.session_state.get("modelfit_r_last_logged")
+            if prev_logged is None or not math.isclose(
+                prev_logged,
+                last_value,
+                rel_tol=1e-9,
+                abs_tol=1e-9,
+            ):
+                logger.info(
+                    "Last segment growth rate (r) sidebar value updated to %s",
+                    last_value,
+                )
+                st.session_state["modelfit_r_last_logged"] = last_value
 
     # Map model-fit overrides into simulator: use last segment r as organic growth if available
     _k_now, _r_now, _gp_now, _gs_now, _gx_now = _current_fit_params()
