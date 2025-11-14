@@ -84,14 +84,6 @@ def fit_piecewise_logistic(
 ) -> PiecewiseLogisticFit:
     """Fit a piecewise-logistic model on monthly totals via grid-search over K and OLS.
 
-    Discrete dynamic on month t (t>=1):
-        ΔS_t = r_seg(t) * S_{t-1} * (1 - S_{t-1}/K) + γ_pulse * pulse_t + γ_step * step_t + γ_exog * exog_t + ε_t
-
-    - r_seg(t) is piecewise-constant across user-provided breakpoints (indices in [0, n)).
-    - K (carrying capacity) is shared across segments and chosen by grid-search.
-    - γ_pulse, γ_step, γ_exog are global coefficients.
-    - Parameters are estimated by OLS on ΔS_t for each candidate K; pick K with lowest SSE.
-
     When ``extra_exog`` is provided, the fitter will, by default, evaluate both contemporaneous
     alignment and a one-period lag (``exog_lags`` defaults to ``[0, 1]``) so that callers that
     constructed their feature on the total-series index do not need to manually shift it to match

@@ -9,7 +9,7 @@ This is a minimal version of the growth model: saturation, ads with diminishing 
 We model daily change in subscribers as:
 
 [
-\Delta S_t = r \cdot S_{t-1}\Bigl(1 - \tfrac{S_{t-1}}{K}\Bigr) + g(a_t) + \gamma \cdot \text{pulse}_t + \varepsilon_t
+\Delta S_t = r \cdot S_{t-1}\Bigl(1 - \tfrac{S_{t-1}}{K}\Bigr) + g(a_t) + \gamma \cdot \text{pulse}_t
 ]
 
 Where:
@@ -20,7 +20,6 @@ Where:
 - **(a_t)**: adstocked spend.
 - **(g(a_t))**: diminishing returns transform of adstock.
 - **(\gamma)**: pulse event effect size.
-- **(\varepsilon_t)**: noise.
 
 ---
 

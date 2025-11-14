@@ -1,6 +1,6 @@
 equation:
 
-St​=S*{t-1}​+rS*{t−1}​(1−St−1​/K)+g(at​)+γpulset​+εt​
+St​=S*{t-1}​+rS*{t−1}​(1−St−1​/K)+g(at​)+γpulset​
 
 Here's yours:
 Params: {'r': 0.0, 'K': 190.99527822543163, 'beta': 0.0, 'theta': nan, 'gamma': 0.0, 'lambda': 0.7937005259840998}
@@ -14,8 +14,7 @@ at - adstocked spend- output of adstock(x, lam) where x = df[ad_col] (or zeros i
 
 g(a_t) — These are things that have a persistent effect. You started writing full time. Your are listed on a famous blog in a blogroll.
 
-g(a_t) is made of a couple things. g(a_t) = γ_exog · log(1 + a_t / θ). a_t = x_t + λ a_{t-1}. So we have this adstock lambda term. If lambda = 0, then there's no carryover. There's a pure pulse of spend. For higher lambda, there's longer persistence.
-
+g(a*t) is made of a couple things. g(a_t) = γ_exog · log(1 + a_t / θ). a_t = x_t + λ a*{t-1}. So we have this adstock lambda term. If lambda = 0, then there's no carryover. There's a pure pulse of spend. For higher lambda, there's longer persistence.
 
 γpulset - these are transient shocks. your piece goes viral on Twitter, Substack itself features you on their homepage, you get a hacket job in the nytimes. You bought a one-time superbowl commercial for your substack. These things have a relatively short half-life.
 
@@ -29,17 +28,9 @@ Then, we've got the shocks labeled, and any changes in growth found. Then, the c
 
 Then, we display our whole equation.
 
-
-
-
-
 Then we need to figure out the benefits of our adspend. To do that, we need to find beta, theta, and lambda.
 
-
-
-
 There are two ways to input ad spending data - a spreadsheet up upload them as events.
-
 
 If you must mix, treat Events for discrete shocks and exogenous for continuous spend
 
