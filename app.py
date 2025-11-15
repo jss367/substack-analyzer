@@ -1102,7 +1102,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             # ----- latex equation & stash for simulator tab -----
             eq = (
                 r"\Delta S_t = r_{seg(t)}\, S_{t-1} \left(1 - \frac{S_{t-1}}{K}\right) "
-                r"+ \gamma_{pulse}\,pulse_t + \gamma_{step}\,step_t"
+                r"+ \alpha_{seg(t)} + \gamma_{pulse}\,pulse_t + \gamma_{step}\,step_t"
             )
             if getattr(fit, "gamma_exog", None) is not None:
                 eq += r" + \gamma_{exog}\,x_t"
@@ -1116,6 +1116,13 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     with suppress(Exception):
                         last_r_text = f"{float(r_list_now[-1]):0.3f}"
                 st.markdown(f"- **Last segment growth rate (r)**: {last_r_text}")
+                intercepts_text = "—"
+                if intercepts_now:
+                    try:
+                        intercepts_text = ", ".join(f"{float(val):0.3f}" for val in intercepts_now)
+                    except Exception:
+                        intercepts_text = ", ".join(str(val) for val in intercepts_now)
+                st.markdown(f"- **Segment intercepts (α)**: {intercepts_text}")
                 st.markdown(f"- **γ_pulse**: {gp_now:0.4f}")
                 st.markdown(f"- **γ_step**: {gs_now:0.4f}")
                 if gx_now is not None:
