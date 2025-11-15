@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Visualize forward-projection tradeoffs for intercept and exogenous terms."""
 
+import math
 from pathlib import Path
 
 import matplotlib
@@ -10,7 +11,15 @@ import pandas as pd
 
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic
-from substack_analyzer.scenarios import niche_steady_series, scenario_ads_really_valuable
+from substack_analyzer.scenarios import (
+    mid_sized_seasonal_conference_series,
+    niche_steady_series,
+    scenario_ads_extremely_valuable,
+    scenario_ads_no_effect,
+    scenario_ads_really_valuable,
+    small_breakout_series,
+    top_tier_sustained_marketing_series,
+)
 from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes
 
 matplotlib.use("Agg")
@@ -26,8 +35,7 @@ def _extend_monthly_index(index: pd.DatetimeIndex, months_ahead: int) -> pd.Date
     if freq is None:
         # The synthetic series in scenarios.py are all month-end; enforce explicitly.
         freq = "M"
-    future = pd.date_range(last + pd.offsets.MonthEnd(1), periods=months_ahead, freq=freq)
-    return future
+    return pd.date_range(last + pd.offsets.MonthEnd(1), periods=months_ahead, freq=freq)
 
 
 def _forecast_with_terms(
@@ -54,9 +62,11 @@ def _forecast_with_terms(
     return np.asarray(values, dtype=float)
 
 
-def _plot_intercept_tradeoff(ax: plt.Axes, months_ahead: int = 24) -> None:
-    series = niche_steady_series()
-    fit = fit_piecewise_logistic(series, breakpoints=[])
+def _plot_intercept_tradeoff(
+    ax: plt.Axes, series: pd.Series, title: str, breakpoints: list[int] | None = None, months_ahead: int = 24
+) -> None:
+    """Plot intercept tradeoff for a given series."""
+    fit = fit_piecewise_logistic(series, breakpoints=breakpoints or [])
 
     k = fit.carrying_capacity
     r_last = fit.segment_growth_rates[-1]
@@ -75,17 +85,24 @@ def _plot_intercept_tradeoff(ax: plt.Axes, months_ahead: int = 24) -> None:
         linestyle="-.",
         color="#ff7f0e",
     )
-    ax.set_title("Effect of keeping fitted intercept")
+    ax.set_title(title)
     ax.set_ylabel("Subscribers")
-    ax.legend(loc="upper left")
+    ax.legend(loc="upper left", fontsize=8)
     ax.grid(True, alpha=0.3)
 
 
-def _plot_exogenous_tradeoff(ax: plt.Axes, months_ahead: int = 24) -> None:
-    series = scenario_ads_really_valuable()
+def _plot_exogenous_tradeoff(
+    ax: plt.Axes,
+    series: pd.Series,
+    title: str,
+    spikes: dict | None = None,
+    months_ahead: int = 24,
+) -> None:
+    """Plot exogenous tradeoff for a given series with ad spend."""
     idx = series.index
     plot_df = pd.DataFrame(index=idx)
-    spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
+    if spikes is None:
+        spikes = {idx[6]: 3000.0, idx[18]: 2000.0}
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
@@ -132,26 +149,77 @@ def _plot_exogenous_tradeoff(ax: plt.Axes, months_ahead: int = 24) -> None:
         linestyle=":",
         color="#2ca02c",
     )
-    ax.set_title("Role of exogenous ad term")
+    ax.set_title(title)
     ax.set_ylabel("Subscribers")
-    ax.legend(loc="upper left")
+    ax.legend(loc="upper left", fontsize=8)
     ax.grid(True, alpha=0.3)
 
     ax.annotate(
         f"γ_exog = {gamma_exog:.2f}\nAssumed future ad_effect_log ≈ {future_exog_continue[0]:.2f}",
         xy=(0.02, 0.02),
         xycoords="axes fraction",
-        fontsize=9,
+        fontsize=8,
         bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.6),
     )
 
 
 def main() -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
-    _plot_intercept_tradeoff(axes[0])
-    _plot_exogenous_tradeoff(axes[1])
-    axes[0].set_xlabel("Month")
-    axes[1].set_xlabel("Month")
+    # Define builder functions for each scenario
+    def _build_niche_steady(ax: plt.Axes) -> None:
+        _plot_intercept_tradeoff(ax, niche_steady_series(), "niche_steady")
+
+    def _build_small_breakout(ax: plt.Axes) -> None:
+        _plot_intercept_tradeoff(ax, small_breakout_series(), "small_breakout", breakpoints=[18, 30])
+
+    def _build_top_tier(ax: plt.Axes) -> None:
+        _plot_intercept_tradeoff(
+            ax, top_tier_sustained_marketing_series(), "top_tier_sustained_marketing", breakpoints=[12, 24, 36]
+        )
+
+    def _build_mid_sized(ax: plt.Axes) -> None:
+        _plot_intercept_tradeoff(ax, mid_sized_seasonal_conference_series(), "mid_sized_seasonal", breakpoints=[10, 20])
+
+    def _build_ads_really_valuable(ax: plt.Axes) -> None:
+        series = scenario_ads_really_valuable()
+        idx = series.index
+        _plot_exogenous_tradeoff(ax, series, "ads_really_valuable", spikes={idx[6]: 3000.0, idx[18]: 2000.0})
+
+    def _build_ads_extremely_valuable(ax: plt.Axes) -> None:
+        series = scenario_ads_extremely_valuable()
+        idx = series.index
+        _plot_exogenous_tradeoff(ax, series, "ads_extremely_valuable", spikes={idx[6]: 15000.0, idx[18]: 20000.0})
+
+    def _build_ads_no_effect(ax: plt.Axes) -> None:
+        series = scenario_ads_no_effect()
+        idx = series.index
+        _plot_exogenous_tradeoff(ax, series, "ads_no_effect", spikes={idx[6]: 3000.0, idx[18]: 2000.0})
+
+    builders: list[tuple[str, callable]] = [
+        ("Intercept: niche_steady", _build_niche_steady),
+        ("Intercept: small_breakout", _build_small_breakout),
+        ("Intercept: top_tier", _build_top_tier),
+        ("Intercept: mid_sized", _build_mid_sized),
+        ("Exog: ads_really_valuable", _build_ads_really_valuable),
+        ("Exog: ads_extremely_valuable", _build_ads_extremely_valuable),
+        ("Exog: ads_no_effect", _build_ads_no_effect),
+    ]
+
+    n = len(builders)
+    cols = 3
+    rows = int(math.ceil(n / cols))
+    fig, axes = plt.subplots(rows, cols, figsize=(16 * cols / 3, 5 * rows), squeeze=False)
+
+    for i, (_, builder) in enumerate(builders):
+        r, c = divmod(i, cols)
+        ax = axes[r][c]
+        builder(ax)
+        ax.set_xlabel("Month")
+
+    # Hide any unused axes
+    for j in range(n, rows * cols):
+        r, c = divmod(j, cols)
+        axes[r][c].axis("off")
+
     plt.tight_layout()
     out_dir = Path("outputs")
     out_dir.mkdir(parents=True, exist_ok=True)
