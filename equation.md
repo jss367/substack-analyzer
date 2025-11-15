@@ -1,37 +1,73 @@
-equation:
+# Piecewise logistic fit (Phase 1)
 
-St​=S*{t-1}​+rS*{t−1}​(1−St−1​/K)+g(at​)+γpulset​
+This document is the authoritative description of the model that the calibration
+pipeline fits today.  The goal is to recover a segmented logistic growth curve on
+monthly **total subscribers** while allowing for both transient and persistent
+externally supplied events and an optional exogenous driver.  The fitter is
+fully deterministic once the inputs are supplied; there is no stochastic noise
+term.
 
-Here's yours:
-Params: {'r': 0.0, 'K': 190.99527822543163, 'beta': 0.0, 'theta': nan, 'gamma': 0.0, 'lambda': 0.7937005259840998}
+## Core dynamics
+For each month-end observation we model the change in total subscribers as
 
-Based on your data, here's what we estimate:
+\[
+\Delta S_t = \sum_{j=1}^{J} r_j \mathbf{1}_{t \in \mathcal{S}_j} \cdot X_t(K)
+             + \sum_{j=1}^{J} \alpha_j \mathbf{1}_{t \in \mathcal{S}_j}
+             + \gamma_{\text{pulse}} P_t
+             + \gamma_{\text{step}} L_t
+             + \gamma_{\text{exog}} E_t,
+\]
 
-r - growth rate: 0.0
-K - carrying capacity: 200
+where
 
-at - adstocked spend- output of adstock(x, lam) where x = df[ad_col] (or zeros if no ads) and lam = fit["lam"] (or a fixed value from half-life)
+- \(X_t(K) = S_{t-1} \bigl(1 - S_{t-1} / K\bigr)\) is the logistic regressor
+  evaluated at the **global** carrying capacity \(K\) selected via grid-search.
+- The index set \(\mathcal{S}_j\) contains the delta rows belonging to segment
+  \(j\).  Segments are constructed from the supplied change points (or from the
+  detector) and allow each growth rate \(r_j\) to shift piecewise over time.
+- \(\alpha_j\) is the segment intercept.  The fitter implements this as a
+  global intercept plus per-segment offsets so that level drift can differ
+  across regimes even when the logistic term is near zero.
+- \(P_t\) is the **pulse** regressor: a one-month spike (1 in the event month,
+  0 otherwise).
+- \(L_t\) is the **step** regressor: it turns on in the event month and remains
+  at 1 thereafter to capture persistent shifts.
+- \(E_t\) is an optional exogenous series supplied by the caller.  When an
+  extra feature is provided the fitter evaluates a small set of integer lags and
+  selects the best-performing alignment; otherwise this term is omitted.
 
-g(a_t) — These are things that have a persistent effect. You started writing full time. Your are listed on a famous blog in a blogroll.
+If no exogenous series is provided we simply drop the
+\(\gamma_{\text{exog}} E_t\) term.  Likewise, if the event tables are empty the
+pulse and step terms are identically zero.
 
-g(a*t) is made of a couple things. g(a_t) = γ_exog · log(1 + a_t / θ). a_t = x_t + λ a*{t-1}. So we have this adstock lambda term. If lambda = 0, then there's no carryover. There's a pure pulse of spend. For higher lambda, there's longer persistence.
+## What the fitter returns
+Running `fit_piecewise_logistic(...)` produces:
 
-γpulset - these are transient shocks. your piece goes viral on Twitter, Substack itself features you on their homepage, you get a hacket job in the nytimes. You bought a one-time superbowl commercial for your substack. These things have a relatively short half-life.
+- the selected carrying capacity \(K\);
+- one growth rate \(r_j\) and intercept \(\alpha_j\) for each segment;
+- the pulse and step coefficients \(\gamma_{\text{pulse}}\) and
+  \(\gamma_{\text{step}}\);
+- the optional exogenous coefficient and lag (when a feature was provided);
+- the deterministic fitted series obtained by integrating the predicted
+  \(\Delta S_t\) values.
 
-OK, so the code should look at the raw data and try to find shocks and changes in growth rate. It throws down a bar at all of those.
+These outputs are packaged in `PiecewiseLogisticFit` and surfaced in the UI and
+handoff artifacts.
 
-Then, you have to go label each of these. What happened? Where they things you did differently, or things that happened to you?
+## Notes and limitations
 
-We also need to look for changes in YOUR growth function. The computer could find these. These are going to be important because this is the only time we made the function piecewise.
+- The regression is solved with ordinary least squares plus a tiny ridge term
+  for numerical stability; no random noise component is estimated.
+- Carrying capacity is shared across segments, but growth rates and intercepts
+  can change whenever the change-point detector inserts a new segment.
+- Event handling treats ads or campaigns entered as **events** as pulses or
+  steps depending on the chosen persistence.  Continuous spend should instead be
+  passed through the exogenous channel if you want it modeled via
+  \(\gamma_{\text{exog}}\).
+- This fitter operates purely on total subscriber counts.  The simulator uses a
+  richer free/premium cohort decomposition; see the simulator documentation for
+  those dynamics.
 
-Then, we've got the shocks labeled, and any changes in growth found. Then, the computer estimates the growth rate for the different time periods. (At the moment, we keep K fixed. In the future, we can change it).
-
-Then, we display our whole equation.
-
-Then we need to figure out the benefits of our adspend. To do that, we need to find beta, theta, and lambda.
-
-There are two ways to input ad spending data - a spreadsheet up upload them as events.
-
-If you must mix, treat Events for discrete shocks and exogenous for continuous spend
-
-Short answer: mark Ads as Transient and let adstock (λ) handle the carryover. Don’t use Persistent for ad spend unless you’re explicitly modeling a permanent step-change (rare).
+By grounding the documentation in the model that actually ships, we avoid the
+confusion caused by the older conceptual equation that omitted intercepts,
+change points, and step events.
