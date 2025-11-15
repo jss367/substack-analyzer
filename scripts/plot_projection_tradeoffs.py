@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Visualize forward-projection tradeoffs for intercept and exogenous terms."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import matplotlib
@@ -44,7 +42,7 @@ def _forecast_with_terms(
     """Simple forward simulation that mirrors the final-segment dynamics."""
 
     values: list[float] = []
-    current = float(last_value)
+    current = last_value
     exog_future = np.asarray(exog_future, dtype=float) if exog_future is not None else None
     for step in range(months_ahead):
         base = current * (1.0 - current / carrying_capacity)
@@ -105,7 +103,7 @@ def _plot_exogenous_tradeoff(ax: plt.Axes, months_ahead: int = 24) -> None:
     baseline = _forecast_with_terms(series.iat[-1], months, k, r_last)
     intercept_only = _forecast_with_terms(series.iat[-1], months, k, r_last, intercept=intercept_last)
 
-    last_exog = float(exog.iloc[-1]) if not exog.empty else 0.0
+    last_exog = float(exog.iloc[-1]) if exog.size > 0 else 0.0
     avg_exog = float(exog.tail(6).mean()) if exog.size else 0.0
     future_exog_continue = np.full(months, avg_exog if np.isfinite(avg_exog) else last_exog)
     with_ads = _forecast_with_terms(
