@@ -1132,12 +1132,18 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if horizon_ahead > 0:
                 last_val = float(fitted_from_overrides.iloc[-1])
                 last_r = float(r_list_now[-1]) if r_list_now else 0.0
+                last_intercept = float(getattr(fit, "gamma_intercept", 0.0))
+                if intercepts_now:
+                    with suppress(Exception):
+                        last_intercept = float(intercepts_now[-1])
                 fc = forecast_piecewise_logistic(
                     last_value=last_val,
                     months_ahead=horizon_ahead,
                     carrying_capacity=float(K_now),
                     segment_growth_rate=float(last_r),
+                    segment_intercept=last_intercept,
                     gamma_step_level=float(gs_now),
+                    gamma_exog=(float(gx_now) if gx_now is not None else None),
                 )
                 fc_index = pd.date_range(
                     fitted_from_overrides.index[-1] + pd.offsets.MonthEnd(1),

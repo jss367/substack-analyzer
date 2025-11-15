@@ -288,20 +288,67 @@ def forecast_piecewise_logistic(
     months_ahead: int,
     carrying_capacity: float,
     segment_growth_rate: float,
+    segment_intercept: float = 0.0,
     gamma_pulse: float = 0.0,
     gamma_step_level: float = 0.0,
+    gamma_exog: float | None = None,
+    exog_future: Sequence[float] | None = None,
+    pulse_sequence: Sequence[float] | None = None,
 ) -> np.ndarray:
-    """Simple forward simulation with constant parameters for months_ahead.
+    """Forward simulation for the last segment using the documented dynamics.
 
-    Uses the final segment's growth rate and optional constant step level.
+    Parameters mirror the fitted equation:
+
+    ΔS_t = r * S_{t-1} (1 - S_{t-1} / K) + α + γ_pulse pulse_t + γ_step step_t + γ_exog x_t
+
+    The `gamma_step_level` argument represents the current step regressor level
+    (typically 0.0 or 1.0) multiplied by its coefficient and is assumed constant
+    over the forecast horizon.  A `pulse_sequence` can be supplied to control
+    future pulses; by default a one-time pulse is applied on the first step to
+    match the historical behaviour.  When `exog_future` is provided and
+    `gamma_exog` is not ``None``, the exogenous contribution is applied
+    element-wise.
     """
+
+    months = max(int(months_ahead), 0)
+    if months == 0:
+        return np.empty(0, dtype=float)
+
     values = [float(last_value)]
-    for _ in range(months_ahead):
-        x_t = values[-1] * (1.0 - values[-1] / carrying_capacity)
-        delta = segment_growth_rate * x_t + gamma_step_level
-        values.append(max(values[-1] + delta + gamma_pulse, 0.0))
-        # Only apply pulse in first step
-        gamma_pulse = 0.0
+
+    if pulse_sequence is None:
+        pulses = [1.0] + [0.0] * max(months - 1, 0)
+    else:
+        pulses = [float(p) for p in pulse_sequence[:months]]
+        if len(pulses) < months:
+            pulses.extend([0.0] * (months - len(pulses)))
+
+    if exog_future is None:
+        exog_vals = [0.0] * months
+    else:
+        exog_vals = [float(val) for val in exog_future[:months]]
+        if len(exog_vals) < months:
+            exog_vals.extend([0.0] * (months - len(exog_vals)))
+
+    intercept = float(segment_intercept)
+    step_level = float(gamma_step_level)
+    growth_rate = float(segment_growth_rate)
+    gamma_p = float(gamma_pulse)
+    gamma_ex = None if gamma_exog is None else float(gamma_exog)
+    capacity = float(carrying_capacity)
+
+    for step_idx in range(months):
+        prev = values[-1]
+        if capacity <= 0:
+            x_t = 0.0
+        else:
+            x_t = prev * (1.0 - prev / capacity)
+        delta = growth_rate * x_t + intercept + step_level
+        delta += gamma_p * pulses[step_idx]
+        if gamma_ex is not None:
+            delta += gamma_ex * exog_vals[step_idx]
+        values.append(max(prev + delta, 0.0))
+
     return np.array(values[1:], dtype=float)
 
 
