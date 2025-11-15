@@ -73,17 +73,15 @@ def _plot_intercept_tradeoff(
     intercept_last = fit.segment_intercepts[-1] if fit.segment_intercepts else fit.gamma_intercept
 
     future_idx = _extend_monthly_index(series.index, months_ahead)
-    baseline = _forecast_with_terms(series.iat[-1], months_ahead, k, r_last)
     with_intercept = _forecast_with_terms(series.iat[-1], months_ahead, k, r_last, intercept=intercept_last)
 
     ax.plot(series.index, series.to_numpy(dtype=float), label="Actual history", color="black", linewidth=1.6)
-    ax.plot(future_idx, baseline, label="Forecast: logistic only", linestyle="--", color="#1f77b4")
     ax.plot(
         future_idx,
         with_intercept,
-        label=f"Forecast: + intercept ({intercept_last:.0f}/mo)",
+        label=f"Forecast (+ intercept {intercept_last:.0f}/mo)",
         linestyle="-.",
-        color="#ff7f0e",
+        color="#1f77b4",
     )
     ax.set_title(title)
     ax.set_ylabel("Subscribers")
@@ -117,7 +115,6 @@ def _plot_exogenous_tradeoff(
     months = months_ahead
     future_idx = _extend_monthly_index(series.index, months)
 
-    baseline = _forecast_with_terms(series.iat[-1], months, k, r_last)
     intercept_only = _forecast_with_terms(series.iat[-1], months, k, r_last, intercept=intercept_last)
 
     last_exog = float(exog.iloc[-1]) if exog.size > 0 else 0.0
@@ -134,13 +131,12 @@ def _plot_exogenous_tradeoff(
     )
 
     ax.plot(series.index, series.to_numpy(dtype=float), label="Actual history", color="black", linewidth=1.6)
-    ax.plot(future_idx, baseline, label="Forecast: logistic only", linestyle="--", color="#1f77b4")
     ax.plot(
         future_idx,
         intercept_only,
-        label="Forecast: + intercept",
+        label="Forecast (+ intercept)",
         linestyle="-.",
-        color="#ff7f0e",
+        color="#1f77b4",
     )
     ax.plot(
         future_idx,
