@@ -31,6 +31,23 @@ def test_forecast_piecewise_logistic_shapes():
     assert (out >= 0).all()
 
 
+def test_forecast_piecewise_logistic_applies_intercept_and_exog():
+    out = forecast_piecewise_logistic(
+        last_value=100.0,
+        months_ahead=3,
+        carrying_capacity=500.0,
+        segment_growth_rate=0.0,
+        segment_intercept=10.0,
+        gamma_pulse=5.0,
+        gamma_step_level=1.5,
+        gamma_exog=2.0,
+        exog_future=[1.0, 2.0, 3.0],
+        pulse_sequence=[0.0, 1.0, 0.0],
+    )
+    expected = np.array([113.5, 134.0, 151.5])
+    assert np.allclose(out, expected)
+
+
 def test_fit_piecewise_logistic_requires_minimum_length():
     idx = pd.period_range("2024-01", periods=3, freq="M").to_timestamp("M")
     s = pd.Series([100, 101, 102], index=idx)
