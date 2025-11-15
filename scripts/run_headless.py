@@ -35,12 +35,7 @@ from substack_analyzer.analysis import (
     read_series,
 )
 from substack_analyzer.calibration import fit_piecewise_logistic
-from substack_analyzer.changepoints import (
-    DetectionConfig,
-    DetectionResult,
-    filter_breakpoints,
-    run_detection,
-)
+from substack_analyzer.changepoints import DetectionConfig, DetectionResult, filter_breakpoints, run_detection
 from substack_analyzer.persistence import export_phase_one_json
 from substack_analyzer.utils import coerce_list, ensure_month_end_index
 
@@ -358,9 +353,7 @@ def run(
     ad_file_handle = _open_file(adspend_path) if adspend_path else None
     lam_best = float(lam) if lam is not None else DEFAULT_ADSTOCK_LAMBDA
     theta_best = float(theta) if theta is not None else DEFAULT_AD_LOG_THETA
-    covariates_df, features_df = build_events_features(
-        plot_df, lam=lam_best, theta=theta_best, ad_file=ad_file_handle
-    )
+    covariates_df, features_df = build_events_features(plot_df, lam=lam_best, theta=theta_best, ad_file=ad_file_handle)
 
     if adspend_path:
         ad_sum = float(covariates_df["ad_spend"].sum()) if "ad_spend" in covariates_df.columns else 0.0
@@ -436,24 +429,32 @@ def run(
         "estimates": est,
     }
     out_dir_path = Path(out_dir)
+    # Track files created in this run
+    created_files: list[str] = []
     (out_dir_path / "summary.json").write_text(json.dumps(out_summary, indent=2))
+    created_files.append("summary.json")
 
     # Write artifacts
     try:
         fit.fitted_series.to_csv(out_dir_path / "fitted_series.csv", header=["fitted"], index_label="date")
+        created_files.append("fitted_series.csv")
     except Exception:
         logger.exception("Failed to write fitted_series.csv")
         raise
     ev_out = st.session_state.get("events_df")
     if isinstance(ev_out, pd.DataFrame) and not ev_out.empty:
         ev_out.to_csv(out_dir_path / "events_normalized.csv", index=False)
+        created_files.append("events_normalized.csv")
     covariates_df.to_csv(out_dir_path / "covariates.csv", index_label="date")
+    created_files.append("covariates.csv")
     features_df.to_csv(out_dir_path / "features.csv", index_label="date")
+    created_files.append("features.csv")
 
     # Save Phase 1 portable artifact
     try:
         p1_bytes = export_phase_one_json()
         (out_dir_path / "phase1.json").write_bytes(p1_bytes)
+        created_files.append("phase1.json")
         logger.info("Phase 1 artifact saved: %s", str((out_dir_path / "phase1.json").resolve()))
         logger.info("You can load phase1.json in the app (Stage 2) to proceed to Phase 2 fit.")
     except Exception as e:
@@ -500,29 +501,20 @@ def run(
         lines.append("- x_t = features['ad_effect_log'] (built from ad_spend with adstock + log transform)")
         lines.append("- pulse_t, step_t = encoded from events (monthly)")
         lines.append("")
-        lines.append("## Files produced (this run)")
-        lines.append("- summary.json: parameters and fit metrics")
-        lines.append("- fitted_series.csv: fitted values for overlay")
-        lines.append("- covariates.csv: monthly ad_spend")
-        lines.append("- features.csv: adstock and log ad effect")
         if isinstance(ev_out, pd.DataFrame) and not ev_out.empty:
             lines.append("- events_normalized.csv: events used in fit")
 
         (out_dir_path / "equation.md").write_text("\n".join(lines))
+        created_files.append("equation.md")
         logger.info("Equation saved: %s", str((out_dir_path / "equation.md").resolve()))
     except Exception:
         logger.info("Equation document not written")
 
     # Final accomplishment log
     # Final narrative summary in logs
-    outputs_list = sorted([p.name for p in out_dir_path.iterdir()])
-    logger.info("Purpose: ingest series + ads, build features, detect changes, fit growth model.")
+    outputs_list = sorted(created_files)
     logger.info("Results: breakpoints=%s, K=%s, segments=%d", bkps, int(k_now) if k_now else None, len(r_list))
     logger.info("Saved: %s", ", ".join(outputs_list))
-    logger.info(
-        "Use: equation.md for formula + params; summary.json for structured params; "
-        "features.csv provides exogenous x_t; fitted_series.csv for overlay."
-    )
 
 
 def _col_arg(s: str) -> str | int:

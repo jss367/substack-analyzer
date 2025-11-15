@@ -37,6 +37,28 @@
             ]
         },
         {
+            "name": "Phase 1: GM",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/Users/julius/git/substack-analyzer/scripts/run_headless.py",
+            "console": "integratedTerminal",
+            "cwd": "/Users/julius/git/substack-analyzer",
+            "justMyCode": true,
+            "args": [
+                "--all",
+                "/Users/julius/git/substack-analyzer/data/thegreymatter_emails_2025-11-15.csv",
+                "--all-has-header",
+                "--all-date-col",
+                "0",
+                "--all-count-col",
+                "1",
+                "--out-dir",
+                "/Users/julius/git/substack-analyzer/outputs",
+                "--detect-on",
+                "total"
+            ]
+        },
+        {
             "name": "Phase 2: Simulator (scenario)",
             "type": "debugpy",
             "request": "launch",
