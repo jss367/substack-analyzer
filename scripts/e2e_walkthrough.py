@@ -27,14 +27,13 @@ VISUALIZE = os.getenv("E2E_VISUALIZE", "1") != "0"
 
 
 def _make_synthetic_series(n_months: int = 48, seed: int = 7) -> pd.Series:
-    rng = np.random.default_rng(seed)
     idx = pd.period_range("2022-01", periods=n_months, freq="M").to_timestamp("M")
     values: list[float] = []
     s = 200.0
     for t in range(n_months):
         r = 0.12 if t < (n_months // 2) else 0.05
         K = 15000.0
-        delta = r * s * (1.0 - s / K) + rng.normal(0.0, 15.0)
+        delta = r * s * (1.0 - s / K)
         s = max(s + delta, 0.0)
         values.append(s)
     return pd.Series(values, index=idx, name="Total")
