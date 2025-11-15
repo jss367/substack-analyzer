@@ -463,13 +463,14 @@ def run(
     try:
         eq = (
             r"$\\Delta S_t = r_{seg(t)} \\, S_{t-1} \\left(1 - \\frac{S_{t-1}}{K}\\right) "
-            r"+ \\gamma_{pulse}\\,pulse_t + \\gamma_{step}\\,step_t$"
+            r"+ \\alpha_{seg(t)} + \\gamma_{pulse}\\,pulse_t + \\gamma_{step}\\,step_t$"
         )
         if getattr(fit, "gamma_exog", None) is not None:
             eq = eq[:-1] + r" + \\gamma_{exog}\\,x_t$"
 
         k_now = getattr(fit, "carrying_capacity", None)
         r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
+        intercept_list = coerce_list(getattr(fit, "segment_intercepts", None))
         gp = getattr(fit, "gamma_pulse", None)
         gs = getattr(fit, "gamma_step", None)
         gx = getattr(fit, "gamma_exog", None)
@@ -484,6 +485,8 @@ def run(
             lines.append(f"- K (capacity): {float(k_now):,.0f}")
         if r_list:
             lines.append("- Segment growth rates r_j: " + ", ".join(f"{r:0.3f}" for r in r_list))
+        if intercept_list:
+            lines.append("- Segment intercepts α_j: " + ", ".join(f"{a:0.3f}" for a in intercept_list))
         if gp is not None:
             lines.append(f"- gamma_pulse: {float(gp):0.4f}")
         if gs is not None:
