@@ -122,6 +122,9 @@ def collect_session_bundle(include_fit: bool, include_sim: bool) -> bytes:
                     "carrying_capacity": float(getattr(fit, "carrying_capacity", 0.0)),
                     "segment_growth_rates": [float(x) for x in getattr(fit, "segment_growth_rates", [])],
                     "breakpoints": list(getattr(fit, "breakpoints", [])),
+                    "breakpoint_level_shifts": [
+                        float(x) for x in getattr(fit, "breakpoint_level_shifts", [])
+                    ],
                     "gamma_pulse": float(getattr(fit, "gamma_pulse", 0.0)),
                     "gamma_step": float(getattr(fit, "gamma_step", 0.0)),
                     "r2_on_deltas": float(getattr(fit, "r2_on_deltas", 0.0)),
@@ -426,6 +429,10 @@ def export_phase_one_json() -> bytes:
             "carrying_capacity": int(round(float(k_val))),
             "segment_growth_rates": [round(float(x), 6) for x in r_list],
             "breakpoints": list(bkps_list),
+            "breakpoint_level_shifts": [
+                round(float(x), 6)
+                for x in (getattr(fit, "breakpoint_level_shifts", []) if fit is not None else [])
+            ],
             "gamma_pulse": _rf(gp_val),
             "gamma_step": _rf(gs_val),
             "gamma_exog": _rf(gx_val),

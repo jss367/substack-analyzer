@@ -420,6 +420,7 @@ def run(
         "breakpoints_paid": (b_paid if 'b_paid' in locals() else None),
         "carrying_capacity": fit.carrying_capacity,
         "segment_growth_rates": fit.segment_growth_rates,
+        "breakpoint_level_shifts": fit.breakpoint_level_shifts,
         "gamma_pulse": fit.gamma_pulse,
         "gamma_step": fit.gamma_step,
         "gamma_exog": fit.gamma_exog,
@@ -464,7 +465,8 @@ def run(
     try:
         eq = (
             r"$\\Delta S_t = r_{seg(t)} \\, S_{t-1} \\left(1 - \\frac{S_{t-1}}{K}\\right) "
-            r"+ \\alpha_{seg(t)} + \\gamma_{pulse}\\,pulse_t + \\gamma_{step}\\,step_t$"
+            r"+ \\alpha_{seg(t)} + \sum_b \\delta_b\\,\mathbf{1}_{t = \\tau_b} "
+            r"+ \\gamma_{pulse}\\,pulse_t + \\gamma_{step}\\,step_t$"
         )
         if getattr(fit, "gamma_exog", None) is not None:
             eq = eq[:-1] + r" + \\gamma_{exog}\\,x_t$"
@@ -475,6 +477,7 @@ def run(
         gp = getattr(fit, "gamma_pulse", None)
         gs = getattr(fit, "gamma_step", None)
         gx = getattr(fit, "gamma_exog", None)
+        bp_level_shifts = coerce_list(getattr(fit, "breakpoint_level_shifts", None))
 
         lines: list[str] = []
         lines.append("# Growth equation (piecewise logistic)")
@@ -488,6 +491,11 @@ def run(
             lines.append("- Segment growth rates r_j: " + ", ".join(f"{r:0.3f}" for r in r_list))
         if intercept_list:
             lines.append("- Segment intercepts α_j: " + ", ".join(f"{a:0.3f}" for a in intercept_list))
+        if bp_level_shifts:
+            lines.append(
+                "- Breakpoint level shifts δ_b: "
+                + ", ".join(f"{shift:0.3f}" for shift in bp_level_shifts)
+            )
         if gp is not None:
             lines.append(f"- gamma_pulse: {float(gp):0.4f}")
         if gs is not None:

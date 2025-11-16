@@ -13,6 +13,7 @@ For each month-end observation we model the change in total subscribers as
 \[
 \Delta S_t = \sum_{j=1}^{J} r_j \mathbf{1}_{t \in \mathcal{S}_j} \cdot X_t(K)
              + \sum_{j=1}^{J} \alpha_j \mathbf{1}_{t \in \mathcal{S}_j}
+             + \sum_b \delta_b \, \mathbf{1}_{t = \tau_b}
              + \gamma_{\text{pulse}} P_t
              + \gamma_{\text{step}} L_t
              + \gamma_{\text{exog}} E_t,
@@ -28,6 +29,10 @@ where
 - \(\alpha_j\) is the segment intercept.  The fitter implements this as a
   global intercept plus per-segment offsets so that level drift can differ
   across regimes even when the logistic term is near zero.
+- Each breakpoint automatically introduces a one-time pulse at the boundary.
+  The coefficient \(\delta_b\) controls the discrete jump applied to that
+  transition so that changepoints can generate level shifts without requiring
+  manual event annotations.
 - \(P_t\) is the **pulse** regressor: a one-month spike (1 in the event month,
   0 otherwise).
 - \(L_t\) is the **step** regressor: it turns on in the event month and remains
@@ -45,6 +50,7 @@ Running `fit_piecewise_logistic(...)` produces:
 
 - the selected carrying capacity \(K\);
 - one growth rate \(r_j\) and intercept \(\alpha_j\) for each segment;
+- the breakpoint-triggered jump sizes \(\delta_b\) (one per breakpoint);
 - the pulse and step coefficients \(\gamma_{\text{pulse}}\) and
   \(\gamma_{\text{step}}\);
 - the optional exogenous coefficient and lag (when a feature was provided);

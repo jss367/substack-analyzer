@@ -165,6 +165,16 @@ def fit_piecewise_logistic(
         for mask in masks[1:]:
             intercept_masks.append(mask.copy())
 
+    # Automatic breakpoint pulses (one-shot level shifts when a new segment starts)
+    breakpoint_pulse_masks: list[np.ndarray] = []
+    if num_segments > 1:
+        for start, _ in seg_bounds[1:]:
+            pulse_mask = np.zeros(n, dtype=float)
+            pulse_row = max(start - 1, 0)
+            if 0 <= pulse_row < n:
+                pulse_mask[pulse_row] = 1.0
+            breakpoint_pulse_masks.append(pulse_mask)
+
     # Hoist loop-invariant computations
     s_lag_arr = s_lag.to_numpy().astype(float)
     y_vec = y.to_numpy().astype(float)
@@ -173,7 +183,14 @@ def fit_piecewise_logistic(
 
     for exog_lag, exog in exog_candidates:
         # Columns count is constant across K for a given exogenous candidate
-        base_col_count = len(masks) + 1 + len(intercept_masks) + 2 + (1 if exog is not None else 0)
+        base_col_count = (
+            len(masks)
+            + 1
+            + len(intercept_masks)
+            + len(breakpoint_pulse_masks)
+            + 2
+            + (1 if exog is not None else 0)
+        )
         ridge_I = lam * np.eye(base_col_count)
         for K in k_grid:
             X_base = s_lag_arr * (1.0 - s_lag_arr / K)
@@ -182,6 +199,8 @@ def fit_piecewise_logistic(
             X_cols.append(ones_vec)  # global intercept baseline
             for im in intercept_masks:
                 X_cols.append(im)
+            for bpm in breakpoint_pulse_masks:
+                X_cols.append(bpm)
             X_cols.append(pulse)
             X_cols.append(step)
             if exog is not None:
@@ -205,7 +224,14 @@ def fit_piecewise_logistic(
             if offset_count:
                 start_idx = num_segments + 1
                 offsets.extend(float(beta[start_idx + i]) for i in range(offset_count))
-            gamma_pulse_idx = num_segments + 1 + offset_count
+            breakpoint_shifts_count = len(breakpoint_pulse_masks)
+            breakpoint_level_shifts: list[float] = []
+            if breakpoint_shifts_count:
+                shift_start = num_segments + 1 + offset_count
+                breakpoint_level_shifts = [
+                    float(beta[shift_start + i]) for i in range(breakpoint_shifts_count)
+                ]
+            gamma_pulse_idx = num_segments + 1 + offset_count + breakpoint_shifts_count
             gamma_pulse = float(beta[gamma_pulse_idx])
             gamma_step = float(beta[gamma_pulse_idx + 1])
             beta_offset = gamma_pulse_idx + 2
@@ -241,6 +267,7 @@ def fit_piecewise_logistic(
                 segment_growth_rates=r_segments,
                 segment_intercepts=segment_intercepts,
                 breakpoints=bps,
+                breakpoint_level_shifts=breakpoint_level_shifts,
                 gamma_pulse=gamma_pulse,
                 gamma_step=gamma_step,
                 fitted_series=fitted,
@@ -269,6 +296,7 @@ def fit_piecewise_logistic(
             segment_growth_rates=best.segment_growth_rates,
             segment_intercepts=best.segment_intercepts,
             breakpoints=best.breakpoints,
+            breakpoint_level_shifts=best.breakpoint_level_shifts,
             gamma_pulse=best.gamma_pulse,
             gamma_step=best.gamma_step,
             fitted_series=best.fitted_series,
@@ -365,6 +393,7 @@ def fitted_series_from_params(
     gamma_exog: float | None = None,
     gamma_intercept: float | None = None,
     segment_intercepts: Sequence[float] | None = None,
+    breakpoint_level_shifts: Sequence[float] | None = None,
 ) -> pd.Series:
     """
     This takes the parameters and uses uses them to predict the future.
@@ -452,11 +481,21 @@ def fitted_series_from_params(
             mask[lo:hi] = 1.0
         masks.append(mask)
     intercept_masks = [m.copy() for m in masks[1:]] if len(masks) > 1 else []
+    breakpoint_pulse_masks: list[np.ndarray] = []
+    if len(seg_bounds) > 1:
+        for start, _ in seg_bounds[1:]:
+            mask = np.zeros(n, dtype=float)
+            pulse_row = max(start - 1, 0)
+            if 0 <= pulse_row < n:
+                mask[pulse_row] = 1.0
+            breakpoint_pulse_masks.append(mask)
 
     X_cols: list[np.ndarray] = [(X_base * m) for m in masks]
     X_cols.append(np.ones(n, dtype=float))
     for im in intercept_masks:
         X_cols.append(im)
+    for bpm in breakpoint_pulse_masks:
+        X_cols.append(bpm)
     pulse_arr = np.asarray(pulse, dtype=float)
     step_arr = np.asarray(step, dtype=float)
     X_cols.append(pulse_arr)
@@ -478,7 +517,13 @@ def fitted_series_from_params(
     for idx, intercept in enumerate(intercepts[1:], start=1):
         beta[num_segments + idx] = float(intercept - baseline_intercept)
     offset_count = max(num_segments - 1, 0)
-    gamma_pulse_idx = num_segments + 1 + offset_count
+    breakpoint_shifts = [float(v) for v in (breakpoint_level_shifts or [])]
+    if len(breakpoint_shifts) < len(breakpoint_pulse_masks):
+        breakpoint_shifts.extend([0.0] * (len(breakpoint_pulse_masks) - len(breakpoint_shifts)))
+    shift_start = num_segments + 1 + offset_count
+    for idx, shift in enumerate(breakpoint_shifts[: len(breakpoint_pulse_masks)]):
+        beta[shift_start + idx] = float(shift)
+    gamma_pulse_idx = shift_start + len(breakpoint_pulse_masks)
     beta[gamma_pulse_idx] = gamma_pulse
     beta[gamma_pulse_idx + 1] = gamma_step
     if exog is not None:

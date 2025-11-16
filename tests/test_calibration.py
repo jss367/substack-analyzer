@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
+import pytest
 
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic, fitted_series_from_params, forecast_piecewise_logistic
@@ -82,6 +83,28 @@ def test_fit_piecewise_logistic_two_segment_rates_ordered():
     fit = fit_piecewise_logistic(s, breakpoints=[5])
     assert len(fit.segment_growth_rates) == 2
     assert fit.segment_growth_rates[0] > fit.segment_growth_rates[1]
+
+
+def test_breakpoints_introduce_level_shift_without_events():
+    idx = pd.period_range("2023-01", periods=10, freq="M").to_timestamp("M")
+    base = pd.Series([100.0] * len(idx), index=idx)
+    breakpoints = [5]
+    level_shift = 80.0
+
+    series = fitted_series_from_params(
+        total_series=base,
+        breakpoints=breakpoints,
+        carrying_capacity=500.0,
+        segment_growth_rates=[0.0, 0.0],
+        segment_intercepts=[0.0, 0.0],
+        breakpoint_level_shifts=[level_shift],
+    )
+
+    fit = fit_piecewise_logistic(series, breakpoints=breakpoints)
+
+    assert len(fit.breakpoint_level_shifts) == len(fit.breakpoints)
+    assert fit.breakpoint_level_shifts[0] == pytest.approx(level_shift, rel=0.05)
+    assert fit.sse < 1e-6
 
 
 def test_fit_piecewise_logistic_events_reduce_sse():

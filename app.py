@@ -1066,6 +1066,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 gamma_step=float(gs_now),
                 gamma_exog=(float(gx_now) if gx_now is not None else None),
                 segment_intercepts=intercepts_now,
+                breakpoint_level_shifts=getattr(fit, "breakpoint_level_shifts", None),
             )
 
             # ----- overlay chart: Actual vs Fitted (overrides) -----
@@ -1102,7 +1103,8 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             # ----- latex equation & stash for simulator tab -----
             eq = (
                 r"\Delta S_t = r_{seg(t)}\, S_{t-1} \left(1 - \frac{S_{t-1}}{K}\right) "
-                r"+ \alpha_{seg(t)} + \gamma_{pulse}\,pulse_t + \gamma_{step}\,step_t"
+                r"+ \alpha_{seg(t)} + \sum_{b} \delta_b\,\mathbf{1}_{t = \tau_b} "
+                r"+ \gamma_{pulse}\,pulse_t + \gamma_{step}\,step_t"
             )
             if getattr(fit, "gamma_exog", None) is not None:
                 eq += r" + \gamma_{exog}\,x_t"
