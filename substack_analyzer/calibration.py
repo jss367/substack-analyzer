@@ -220,10 +220,7 @@ def fit_piecewise_logistic(
                 start_idx = num_segments + 1
                 offsets.extend(float(beta[start_idx + i]) for i in range(offset_count))
             breakpoint_shifts_count = len(breakpoint_pulse_masks)
-            breakpoint_level_shifts: list[float] = []
-            if breakpoint_shifts_count:
-                shift_start = num_segments + 1 + offset_count
-                breakpoint_level_shifts = [float(beta[shift_start + i]) for i in range(breakpoint_shifts_count)]
+
             gamma_pulse_idx = num_segments + 1 + offset_count + breakpoint_shifts_count
             gamma_pulse = float(beta[gamma_pulse_idx])
             gamma_step = float(beta[gamma_pulse_idx + 1])
@@ -266,7 +263,6 @@ def fit_piecewise_logistic(
                 segment_growth_rates=r_segments,
                 segment_intercepts=segment_intercepts,
                 breakpoints=bps,
-                breakpoint_level_shifts=breakpoint_level_shifts,
                 gamma_pulse=gamma_pulse,
                 gamma_step=gamma_step,
                 fitted_series=fitted,
@@ -295,7 +291,6 @@ def fit_piecewise_logistic(
             segment_growth_rates=best.segment_growth_rates,
             segment_intercepts=best.segment_intercepts,
             breakpoints=best.breakpoints,
-            breakpoint_level_shifts=best.breakpoint_level_shifts,
             gamma_pulse=best.gamma_pulse,
             gamma_step=best.gamma_step,
             fitted_series=best.fitted_series,
