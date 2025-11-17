@@ -87,3 +87,77 @@ def plot_fit_vs_actual(
     # if show:
     #     plt.show()
     return ax
+
+
+def plot_fit_comparison(
+    input_series: pd.Series,
+    fit_with_shifts: PiecewiseLogisticFit,
+    fit_legacy: PiecewiseLogisticFit,
+    title: str | None = None,
+    show_breakpoints: bool = True,
+    ax: plt.Axes | None = None,
+    show: bool = False,
+):
+    """Overlay actuals with both the breakpoint-shift fit and the legacy smooth fit."""
+
+    actual = ensure_month_end_index(input_series).astype(float)
+    fitted_shift = fit_with_shifts.fitted_series.reindex(actual.index).astype(float)
+    fitted_legacy = fit_legacy.fitted_series.reindex(actual.index).astype(float)
+
+    if title is None:
+        title = (
+            "Actual vs fitted — breakpoint jumps vs legacy"
+            f"\nΔS SSE: jumps={fit_with_shifts.sse:,.0f} · legacy={fit_legacy.sse:,.0f}"
+        )
+
+    created_fig = False
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        created_fig = True
+    else:
+        fig = ax.figure
+
+    ax.plot(actual.index, actual.values, marker="o", linewidth=1.6, label="Actual", color="#1f77b4")
+    ax.plot(
+        actual.index,
+        fitted_shift.values,
+        marker="o",
+        linewidth=1.6,
+        label="Fitted (with breakpoint jumps)",
+        color="#2ca02c",
+    )
+    ax.plot(
+        actual.index,
+        fitted_legacy.values,
+        marker="o",
+        linewidth=1.6,
+        linestyle="--",
+        label="Fitted (legacy smooth)",
+        color="#d62728",
+    )
+
+    if show_breakpoints and getattr(fit_with_shifts, "breakpoints", None):
+        idx = actual.index
+        for b in fit_with_shifts.breakpoints:
+            if not isinstance(b, int):
+                continue
+            if b <= 0:
+                x = idx[0]
+            elif b < len(idx):
+                x = idx[b - 1]
+            else:
+                continue
+            ax.axvline(x, color="#7f8c8d", linestyle=":", linewidth=1.1)
+
+    ax.set_title(title)
+    ax.set_ylabel("Subscribers")
+    ax.set_xlabel("Date")
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=6, maxticks=12))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
+    fig.autofmt_xdate(rotation=30)
+    ax.grid(True, linestyle=":", alpha=0.5)
+    ax.legend()
+    plt.tight_layout()
+    if show and created_fig:
+        plt.show()
+    return ax

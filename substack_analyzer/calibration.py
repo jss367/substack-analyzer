@@ -81,6 +81,7 @@ def fit_piecewise_logistic(
     k_grid: Sequence[float] | None = None,
     extra_exog: pd.Series | None = None,
     exog_lags: Sequence[int] | None = None,
+    enable_breakpoint_level_shifts: bool = True,
 ) -> PiecewiseLogisticFit:
     """Fit a piecewise-logistic model on monthly totals via grid-search over K and OLS.
 
@@ -167,7 +168,7 @@ def fit_piecewise_logistic(
 
     # Automatic breakpoint pulses (one-shot level shifts when a new segment starts)
     breakpoint_pulse_masks: list[np.ndarray] = []
-    if num_segments > 1:
+    if enable_breakpoint_level_shifts and num_segments > 1:
         for start, _ in seg_bounds[1:]:
             pulse_mask = np.zeros(n, dtype=float)
             pulse_row = max(start - 1, 0)

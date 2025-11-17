@@ -36,6 +36,7 @@ from substack_analyzer.analysis import (
 )
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.changepoints import DetectionConfig, DetectionResult, filter_breakpoints, run_detection
+from substack_analyzer.plot_utils import plot_fit_comparison
 from substack_analyzer.persistence import export_phase_one_json
 from substack_analyzer.utils import coerce_list, ensure_month_end_index
 
@@ -398,6 +399,13 @@ def run(
         events_df=st.session_state.get("events_df"),
         extra_exog=exog,
     )
+    fit_legacy = fit_piecewise_logistic(
+        total_series=fit_series,
+        breakpoints=bkps,
+        events_df=st.session_state.get("events_df"),
+        extra_exog=exog,
+        enable_breakpoint_level_shifts=False,
+    )
     # Expose fit in session state so phase1.json export can include fit params
     st.session_state["pwlog_fit"] = fit
     try:
@@ -427,6 +435,8 @@ def run(
         "gamma_intercept": fit.gamma_intercept,
         "sse": fit.sse,
         "r2_on_deltas": fit.r2_on_deltas,
+        "legacy_sse": fit_legacy.sse,
+        "legacy_r2_on_deltas": fit_legacy.r2_on_deltas,
         "estimates": est,
     }
     out_dir_path = Path(out_dir)
@@ -442,6 +452,19 @@ def run(
     except Exception:
         logger.exception("Failed to write fitted_series.csv")
         raise
+    try:
+        ax = plot_fit_comparison(
+            input_series=fit_series,
+            fit_with_shifts=fit,
+            fit_legacy=fit_legacy,
+            title="Actual vs fitted (breakpoint jumps vs legacy)",
+            show_breakpoints=False,
+        )
+        ax.figure.savefig(out_dir_path / "fit_comparison.png", bbox_inches="tight")
+        created_files.append("fit_comparison.png")
+        logger.info("Fit comparison plot saved: %s", str((out_dir_path / "fit_comparison.png").resolve()))
+    except Exception:
+        logger.exception("Failed to write fit_comparison.png")
     ev_out = st.session_state.get("events_df")
     if isinstance(ev_out, pd.DataFrame) and not ev_out.empty:
         ev_out.to_csv(out_dir_path / "events_normalized.csv", index=False)

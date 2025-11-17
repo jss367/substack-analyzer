@@ -107,6 +107,19 @@ def test_breakpoints_introduce_level_shift_without_events():
     assert fit.sse < 1e-6
 
 
+def test_can_disable_breakpoint_level_shifts_for_legacy_comparison():
+    idx = pd.period_range("2021-01", periods=10, freq="M").to_timestamp("M")
+    vals = [100, 120, 140, 160, 180, 200, 430, 450, 470, 490]
+    series = pd.Series(vals, index=idx)
+
+    fit_jump = fit_piecewise_logistic(series, breakpoints=[6])
+    fit_legacy = fit_piecewise_logistic(series, breakpoints=[6], enable_breakpoint_level_shifts=False)
+
+    assert any(abs(v) > 1e-6 for v in fit_jump.breakpoint_level_shifts)
+    assert all(abs(v) < 1e-9 for v in fit_legacy.breakpoint_level_shifts)
+    assert fit_jump.sse < fit_legacy.sse
+
+
 def test_fit_piecewise_logistic_events_reduce_sse():
     # Series with a one-time spike in delta that events can explain
     idx = pd.period_range("2024-01", periods=7, freq="M").to_timestamp("M")
