@@ -227,6 +227,34 @@ def fit_piecewise_logistic(
             beta_offset = gamma_pulse_idx + 2
             gamma_exog = float(beta[beta_offset]) if exog is not None and len(beta) > beta_offset else None
 
+            # Enforce non-negative constraint on gamma_exog by refitting if needed
+            if gamma_exog is not None and gamma_exog < 0.0:
+                # Refit with gamma_exog fixed at 0 (remove exog column from design matrix)
+                X_constrained = X[:, :-1]  # Remove last column (exog)
+                base_col_count_constrained = base_col_count - 1
+                ridge_I_constrained = lam * np.eye(base_col_count_constrained)
+                XtX_constrained = X_constrained.T @ X_constrained
+                Xty_constrained = X_constrained.T @ y_vec
+                try:
+                    beta_constrained = np.linalg.solve(XtX_constrained + ridge_I_constrained, Xty_constrained)
+                except np.linalg.LinAlgError:
+                    beta_constrained, _, _, _ = np.linalg.lstsq(X_constrained, y_vec, rcond=None)
+
+                # Re-extract parameters from constrained fit
+                gamma_exog = 0.0
+                r_segments = [float(b) for b in beta_constrained[:num_segments]]
+                gamma_intercept = float(beta_constrained[num_segments])
+                offsets = [0.0]
+                if offset_count:
+                    start_idx = num_segments + 1
+                    offsets.extend(float(beta_constrained[start_idx + i]) for i in range(offset_count))
+                gamma_pulse = float(beta_constrained[gamma_pulse_idx])
+                gamma_step = float(beta_constrained[gamma_pulse_idx + 1])
+
+                # Use constrained X and beta for fitted values
+                X = X_constrained
+                beta = beta_constrained
+
             segment_intercepts = [gamma_intercept + offsets[i] for i in range(num_segments)] if num_segments else []
 
             # Reconstruct fitted series by integrating predicted deltas from the linear model
@@ -356,7 +384,8 @@ def forecast_piecewise_logistic(
     step_level = float(gamma_step_level)
     growth_rate = float(segment_growth_rate)
     gamma_p = float(gamma_pulse)
-    gamma_ex = None if gamma_exog is None else float(gamma_exog)
+    # Enforce non-negative constraint on gamma_exog
+    gamma_ex = None if gamma_exog is None else max(0.0, float(gamma_exog))
     capacity = float(carrying_capacity)
 
     for step_idx in range(months):
@@ -410,6 +439,10 @@ def fitted_series_from_params(
             exog = np.where(np.isfinite(exog), exog, 0.0)
         except Exception:
             exog = None
+
+    # Enforce non-negative constraint on gamma_exog
+    if gamma_exog is not None and gamma_exog < 0.0:
+        gamma_exog = 0.0
 
     # Sanitise breakpoints in the same manner as the fitter
     n_series = len(s)
@@ -521,7 +554,9 @@ def fitted_series_from_params(
     beta[gamma_pulse_idx] = gamma_pulse
     beta[gamma_pulse_idx + 1] = gamma_step
     if exog is not None:
-        beta[gamma_pulse_idx + 2] = gamma_exog if gamma_exog is not None else 0.0
+        # Enforce non-negative constraint on gamma_exog
+        gamma_exog_constrained = max(0.0, gamma_exog) if gamma_exog is not None else 0.0
+        beta[gamma_pulse_idx + 2] = gamma_exog_constrained
 
     y_hat = X @ beta
     s_hat = np.empty(n + 1, dtype=float)

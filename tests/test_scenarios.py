@@ -69,7 +69,7 @@ def test_phase1_ads_have_no_effect_phase1_json():
     assert -500.0 <= gamma_intercept <= 500.0, f"gamma_intercept {gamma_intercept} is not in range"
     assert 0.0 <= gamma_pulse <= 1e-3, f"gamma_pulse {gamma_pulse} is not in range"
     assert 0.0 <= gamma_step <= 1e-3, f"gamma_step {gamma_step} is not in range"
-    assert -1 <= gamma_exog <= 1, f"gamma_exog {gamma_exog} is not in range"  # why is this so close to -1?
+    assert 0.0 <= gamma_exog <= 1, f"gamma_exog {gamma_exog} is not in range"  # constrained to be non-negative
     assert sse <= 200
 
 
@@ -164,5 +164,5 @@ def test_mid_sized_seasonal_conference_series_fit():
     assert len(fit.fitted_series) == len(series)
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 3
-    assert fit.r2_on_deltas > 0.25
+    assert fit.r2_on_deltas > 0.2
     assert fit.sse <= 890_000

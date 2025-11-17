@@ -234,7 +234,7 @@ def test_cy_series_ad_effect():
     fit_with_exog = fit_piecewise_logistic(series, breakpoints=bkps, extra_exog=exog)
 
     # Ads should not meaningfully explain changes in this scenario
-    assert -1 <= fit_with_exog.gamma_exog <= 1  # currently 0.138
+    assert 0 <= fit_with_exog.gamma_exog <= 1  # currently 0.138
     sse_improvement = float(fit_no_exog.sse - fit_with_exog.sse)
     assert sse_improvement / float(fit_no_exog.sse) <= 0.10
 
