@@ -1301,7 +1301,7 @@ def metrics_and_apply_ui(all_series: pd.Series | None, paid_series: pd.Series | 
         st.session_state["ad_one_time_month"] = 1
         st.session_state["spend_mode_index"] = 1
         st.session_state["conv_new"] = 0.0
-        st.session_state["horizon_months"] = max(int(_get_state("horizon_months", 60)), 24)
+        st.session_state["horizon_months"] = 24
         # Ensure the Simulator shows an equation even if model fit wasn't run
         if "growth_equation_latex" not in st.session_state:
             st.session_state["growth_equation_latex"] = (
@@ -1414,11 +1414,12 @@ def sidebar_inputs() -> SimulationInputs:
         )
 
     with st.sidebar.expander("Horizon", expanded=False):
+        horizon_default = int(_get_state("horizon_months", 24))
         horizon = slider_state(
             "Months to simulate",
             min_value=12,
-            max_value=120,
-            default_value=int(_get_state("horizon_months", 60)),
+            max_value=24,
+            default_value=max(12, min(horizon_default, 24)),
             step=6,
             key="horizon_months",
         )
