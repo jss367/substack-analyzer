@@ -78,9 +78,13 @@ class SimulationInputs:
     starting_free_subscribers: int = 0
     starting_premium_subscribers: int = 0
 
-    # Optional carrying capacity (total subscribers) that damps growth as the
-    # audience approaches the inferred ceiling from Phase 1 fits.
+    # Optional carrying capacities that damp growth as the audience approaches
+    # the inferred ceiling from Phase 1 fits. If segment-specific capacities
+    # are provided they take precedence; otherwise `carrying_capacity` is used
+    # as a shared ceiling for both free and premium.
     carrying_capacity: float | None = None
+    carrying_capacity_free: float | None = None
+    carrying_capacity_premium: float | None = None
 
     # Horizon
     horizon_months: int = 60
@@ -96,7 +100,9 @@ class SimulationInputs:
 
     # Acquisition
     cost_per_new_free_subscriber: float = 2.00
+    cost_per_new_premium_subscriber: float = 10.00
     ad_spend_schedule: AdSpendSchedule = AdSpendSchedule.two_stage(3000.0, 1000.0)
+    premium_ad_spend_schedule: AdSpendSchedule = AdSpendSchedule.constant(0.0)
     ad_manager_monthly_fee: float = 1500.0
     # Diminishing returns parameters for paid acquisition
     adstock_lambda: float = 0.5  # carryover of prior ad effectiveness

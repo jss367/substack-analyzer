@@ -1478,84 +1478,95 @@ def sidebar_inputs() -> SimulationInputs:
             key="conv_ongoing",
         )
 
-    with st.sidebar.expander("Acquisition", expanded=True):
+    def _spend_controls(prefix: str, label_prefix: str, default_index: int = 1) -> tuple[AdSpendSchedule, int | None]:
         spend_mode_options = ["Two-stage (Year 1 / Year 2+)", "Constant", "One-time"]
-        spend_mode_index = int(_get_state("spend_mode_index", 1))
+        spend_mode_index = int(_get_state(f"{prefix}_spend_mode_index", default_index))
         spend_mode_index = max(0, min(spend_mode_index, len(spend_mode_options) - 1))
         spend_mode = st.selectbox(
-            "Ad spend schedule",
+            f"Ad spend schedule ({label_prefix})",
             spend_mode_options,
             index=spend_mode_index,
-            key="spend_mode",
+            key=f"{prefix}_spend_mode",
         )
         one_time_trigger_idx = None
         if spend_mode.startswith("Two-stage"):
             stage1 = number_input_state(
-                "Monthly ad spend (year 1)",
+                f"Monthly ad spend (year 1, {label_prefix.lower()})",
                 min_value=0.0,
-                default_value=float(_get_state("ad_stage1", 0.0)),
+                default_value=float(_get_state(f"{prefix}_ad_stage1", 0.0)),
                 step=50.0,
-                key="ad_stage1",
+                key=f"{prefix}_ad_stage1",
             )
             stage2 = number_input_state(
-                "Monthly ad spend (year 2+)",
+                f"Monthly ad spend (year 2+, {label_prefix.lower()})",
                 min_value=0.0,
-                default_value=float(_get_state("ad_stage2", 0.0)),
+                default_value=float(_get_state(f"{prefix}_ad_stage2", 0.0)),
                 step=50.0,
-                key="ad_stage2",
+                key=f"{prefix}_ad_stage2",
             )
             stage1 = float(stage1 or 0.0)
             stage2 = float(stage2 or 0.0)
             ad_schedule = AdSpendSchedule.two_stage(stage1, stage2)
-            st.session_state["spend_mode_index"] = 0
+            st.session_state[f"{prefix}_spend_mode_index"] = 0
         elif spend_mode == "Constant":
             const_spend = number_input_state(
-                "Monthly ad spend (constant)",
+                f"Monthly ad spend (constant, {label_prefix.lower()})",
                 min_value=0.0,
-                default_value=float(_get_state("ad_const", 0.0)),
+                default_value=float(_get_state(f"{prefix}_ad_const", 0.0)),
                 step=50.0,
-                key="ad_const",
+                key=f"{prefix}_ad_const",
             )
             const_spend = float(const_spend or 0.0)
             ad_schedule = AdSpendSchedule.constant(const_spend)
-            st.session_state["spend_mode_index"] = 1
+            st.session_state[f"{prefix}_spend_mode_index"] = 1
         else:
             one_time_amount = number_input_state(
-                "One-time ad spend amount",
+                f"One-time ad spend amount ({label_prefix.lower()})",
                 min_value=0.0,
-                default_value=float(_get_state("ad_one_time_amount", 0.0)),
+                default_value=float(_get_state(f"{prefix}_ad_one_time_amount", 0.0)),
                 step=50.0,
-                key="ad_one_time_amount",
+                key=f"{prefix}_ad_one_time_amount",
             )
-            default_month = int(_get_state("ad_one_time_month", 1))
+            default_month = int(_get_state(f"{prefix}_ad_one_time_month", 1))
             horizon_int = max(int(horizon), 1)
             default_month = min(max(default_month, 1), horizon_int)
             one_time_month = number_input_state(
-                "One-time spend month",
+                f"One-time spend month ({label_prefix.lower()})",
                 min_value=1,
                 max_value=horizon_int,
                 default_value=default_month,
                 step=1,
-                key="ad_one_time_month",
+                key=f"{prefix}_ad_one_time_month",
             )
             one_time_amount = float(one_time_amount or 0.0)
             one_time_trigger_idx = max(int(one_time_month or 1) - 1, 0)
             ad_schedule = AdSpendSchedule.one_time(one_time_amount, one_time_trigger_idx)
-            st.session_state["spend_mode_index"] = 2
+            st.session_state[f"{prefix}_spend_mode_index"] = 2
 
-        with st.sidebar.expander("Ad spend preview", expanded=False):
+        return ad_schedule, one_time_trigger_idx
+
+    def _spend_preview(ad_schedule: AdSpendSchedule, trigger_idx: int | None, label: str) -> None:
+        with st.sidebar.expander(f"Ad spend preview ({label})", expanded=False):
             horizon_idx = max(int(horizon) - 1, 0)
             candidates = [0, 11, 23, 35, 59, horizon_idx]
             preview_months = sorted({min(max(m, 0), horizon_idx) for m in candidates})
-            if one_time_trigger_idx is not None and horizon_idx >= 0:
+            if trigger_idx is not None and horizon_idx >= 0:
                 preview_months = sorted(
                     set(preview_months)
-                    | {min(max(one_time_trigger_idx, 0), horizon_idx)}
+                    | {min(max(trigger_idx, 0), horizon_idx)}
                 )
             preview_rows = {
-                f"Month {m + 1}": format_currency(float(ad_schedule.get_spend_for_month(m))) for m in preview_months
+                f"Month {m + 1}": format_currency(float(ad_schedule.get_spend_for_month(m)))
+                for m in preview_months
             }
             st.write("Representative monthly ad spend:", preview_rows)
+
+    with st.sidebar.expander("Acquisition", expanded=True):
+        st.caption("Configure paid acquisition for free signups and premium-direct campaigns.")
+        ad_schedule, one_time_trigger_idx_free = _spend_controls("free", "Free")
+        premium_ad_schedule, one_time_trigger_idx_premium = _spend_controls("premium", "Premium")
+        _spend_preview(ad_schedule, one_time_trigger_idx_free, "Free")
+        _spend_preview(premium_ad_schedule, one_time_trigger_idx_premium, "Premium")
 
         cac = number_input_state(
             "Cost per new free subscriber (CAC)",
@@ -1563,6 +1574,13 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("cac", 2.0)),
             step=0.1,
             key="cac",
+        )
+        cac_premium = number_input_state(
+            "Cost per new premium subscriber (direct CAC)",
+            min_value=0.01,
+            default_value=float(_get_state("cac_premium", 10.0)),
+            step=0.5,
+            key="cac_premium",
         )
         ad_manager_fee = number_input_state(
             "Ad manager monthly fee",
@@ -1794,10 +1812,30 @@ def sidebar_inputs() -> SimulationInputs:
         carrying_capacity = k_float
     organic_from_fit = float(_r_now[-1]) if (_r_now and len(_r_now) > 0) else float(organic_growth)
 
+    capacity_free = number_input_state(
+        "Free carrying capacity (optional)",
+        min_value=0.0,
+        default_value=float(_get_state("carrying_capacity_free", 0.0)),
+        step=100.0,
+        key="carrying_capacity_free",
+    )
+    capacity_premium = number_input_state(
+        "Premium carrying capacity (optional)",
+        min_value=0.0,
+        default_value=float(_get_state("carrying_capacity_premium", 0.0)),
+        step=100.0,
+        key="carrying_capacity_premium",
+    )
+
+    carrying_capacity_free = float(capacity_free) if float(capacity_free or 0.0) > 0 else None
+    carrying_capacity_premium = float(capacity_premium) if float(capacity_premium or 0.0) > 0 else None
+
     return SimulationInputs(
         starting_free_subscribers=start_free,
         starting_premium_subscribers=start_premium,
         carrying_capacity=carrying_capacity,
+        carrying_capacity_free=carrying_capacity_free,
+        carrying_capacity_premium=carrying_capacity_premium,
         horizon_months=horizon,
         organic_monthly_growth_rate=organic_from_fit,
         monthly_churn_rate_free=float(churn_free),
@@ -1805,7 +1843,9 @@ def sidebar_inputs() -> SimulationInputs:
         new_subscriber_premium_conv_rate=float(conv_new),
         ongoing_premium_conv_rate=float(conv_ongoing),
         cost_per_new_free_subscriber=float(cac),
+        cost_per_new_premium_subscriber=float(cac_premium),
         ad_spend_schedule=ad_schedule,
+        premium_ad_spend_schedule=premium_ad_schedule,
         ad_manager_monthly_fee=float(ad_manager_fee),
         premium_monthly_price_gross=float(price_monthly),
         premium_annual_price_gross=float(price_annual),
@@ -1830,10 +1870,20 @@ def render_kpis(df: pd.DataFrame) -> None:
     col5.metric("Cumulative ad spend", format_currency(last.cumulative_ad_spend))
     roas = 0.0 if last.cumulative_ad_spend == 0 else (df.net_revenue.sum() / df.ad_spend.sum())
     col6.metric("ROAS (net revenue / ad spend)", f"{roas:0.2f}x")
-    avg_cac = float("nan") if df.new_free_paid.sum() == 0 else df.ad_spend.sum() / df.new_free_paid.sum()
-    col7.metric("Blended CAC (paid only)", format_currency(avg_cac))
+    free_paid = df.new_free_paid.sum()
+    free_paid_spend = df.ad_spend_free.sum()
+    avg_cac_free = float("nan") if free_paid == 0 else free_paid_spend / free_paid
+    col7.metric("Blended free CAC (paid only)", format_currency(avg_cac_free))
     payback_month = next((i + 1 for i, c in enumerate(df.cumulative_net_profit) if c > 0), math.nan)
     col8.metric("Payback month (cumulative)", "—" if math.isnan(payback_month) else str(int(payback_month)))
+
+    col9, col10, col11, _ = st.columns(4)
+    premium_paid = df.new_premium_paid.sum() if "new_premium_paid" in df.columns else 0
+    premium_paid_spend = df.ad_spend_premium.sum() if "ad_spend_premium" in df.columns else 0
+    avg_cac_premium = float("nan") if premium_paid == 0 else premium_paid_spend / premium_paid
+    col9.metric("Blended premium CAC (paid only)", format_currency(avg_cac_premium))
+    col10.metric("Premium ad spend", format_currency(df.ad_spend_premium.sum()))
+    col11.metric("Free ad spend", format_currency(df.ad_spend_free.sum()))
 
 
 def render_charts(df: pd.DataFrame) -> None:
