@@ -213,15 +213,15 @@ def _event_rules_from_events() -> alt.Chart | None:
     ev_p = ev2[ev2.get("effect_norm") == "Persistent"]
     if not ev_p.empty:
         logger.info("Adding persistent event rules")
-        layers.append(
-            alt.Chart(ev_p)
-            .mark_rule(strokeWidth=2, color="#27ae60")
-            .encode(
-                x=alt.X("marker_date:T", title="Date"),
-                tooltip=[
-                    alt.Tooltip("date:T", title="Date"),
-                    alt.Tooltip("type:N", title="Type"),
-                    alt.Tooltip("effect_norm:N", title="Effect"),
+            layers.append(
+                alt.Chart(ev_p)
+                .mark_rule(strokeWidth=2, color="#27ae60")
+                .encode(
+                    x=alt.X("marker_date:T", title="Date (monthly)"),
+                    tooltip=[
+                        alt.Tooltip("date:T", title="Date"),
+                        alt.Tooltip("type:N", title="Type"),
+                        alt.Tooltip("effect_norm:N", title="Effect"),
                     alt.Tooltip("notes:N", title="Notes"),
                     alt.Tooltip("cost:Q", title="Cost ($)"),
                 ],
@@ -231,15 +231,15 @@ def _event_rules_from_events() -> alt.Chart | None:
     ev_t = ev2[ev2.get("effect_norm") == "Transient"]
     if not ev_t.empty:
         logger.info("Adding transient event rules")
-        layers.append(
-            alt.Chart(ev_t)
-            .mark_rule(strokeWidth=2, color="#8e44ad", strokeDash=[6, 4])
-            .encode(
-                x=alt.X("marker_date:T", title="Date"),
-                tooltip=[
-                    alt.Tooltip("date:T", title="Date"),
-                    alt.Tooltip("type:N", title="Type"),
-                    alt.Tooltip("effect_norm:N", title="Effect"),
+            layers.append(
+                alt.Chart(ev_t)
+                .mark_rule(strokeWidth=2, color="#8e44ad", strokeDash=[6, 4])
+                .encode(
+                    x=alt.X("marker_date:T", title="Date (monthly)"),
+                    tooltip=[
+                        alt.Tooltip("date:T", title="Date"),
+                        alt.Tooltip("type:N", title="Type"),
+                        alt.Tooltip("effect_norm:N", title="Effect"),
                     alt.Tooltip("notes:N", title="Notes"),
                     alt.Tooltip("cost:Q", title="Cost ($)"),
                 ],
@@ -249,15 +249,15 @@ def _event_rules_from_events() -> alt.Chart | None:
     ev_n = ev2[ev2.get("effect_norm") == "No effect"]
     if not ev_n.empty:
         logger.info("Adding no effect event rules")
-        layers.append(
-            alt.Chart(ev_n)
-            .mark_rule(strokeWidth=2, color="#bdc3c7", strokeDash=[2, 4])
-            .encode(
-                x=alt.X("marker_date:T", title="Date"),
-                tooltip=[
-                    alt.Tooltip("date:T", title="Date"),
-                    alt.Tooltip("type:N", title="Type"),
-                    alt.Tooltip("effect_norm:N", title="Effect"),
+            layers.append(
+                alt.Chart(ev_n)
+                .mark_rule(strokeWidth=2, color="#bdc3c7", strokeDash=[2, 4])
+                .encode(
+                    x=alt.X("marker_date:T", title="Date (monthly)"),
+                    tooltip=[
+                        alt.Tooltip("date:T", title="Date"),
+                        alt.Tooltip("type:N", title="Type"),
+                        alt.Tooltip("effect_norm:N", title="Effect"),
                     alt.Tooltip("notes:N", title="Notes"),
                     alt.Tooltip("cost:Q", title="Cost ($)"),
                 ],
@@ -1077,7 +1077,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 {"Actual": fit_series_source, "Fitted": fitted_from_overrides.reindex(fit_series_source.index)}
             )
             base_overlay = alt.Chart(overlay_df.reset_index().rename(columns={"index": "date"})).encode(
-                x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %Y"))
+                x=alt.X("date:T", title="Date (monthly)", axis=alt.Axis(format="%b %Y"))
             )
             actual_line = (
                 base_overlay.transform_fold(["Actual"], as_=["Series", "Value"])
@@ -1161,7 +1161,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     .transform_fold(["Actual", "Fitted", "Forecast"], as_=["Series", "Value"])
                     .mark_line()
                     .encode(
-                        x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %Y")),
+                        x=alt.X("date:T", title="Date (monthly)", axis=alt.Axis(format="%b %Y")),
                         y="Value:Q",
                         color="Series:N",
                     )
@@ -1240,7 +1240,7 @@ def tail_view_ui(
                     .encode(
                         x=alt.X(
                             "date:T",
-                            title="Date",
+                            title="Date (monthly)",
                             axis=alt.Axis(
                                 labelExpr="timeFormat(datum.value, '%b %Y')",
                                 labelAngle=0,

@@ -167,7 +167,7 @@ def plot_series(plot_df: pd.DataFrame, use_dual_axis: bool, show_total: bool, se
     base = alt.Chart(plot_df.reset_index().rename(columns={"index": "date"})).encode(
         x=alt.X(
             "date:T",
-            title="Date",
+            title="Date (monthly)",
             axis=alt.Axis(
                 labelExpr="timeFormat(datum.value, '%b %Y')",
                 labelAngle=0,
