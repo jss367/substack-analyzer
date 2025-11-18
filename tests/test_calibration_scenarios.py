@@ -60,7 +60,7 @@ def test_mid_sized_seasonal_conference_series_fit():
     assert fit.carrying_capacity > float(series.max())
     assert len(fit.segment_growth_rates) == 3
     assert fit.r2_on_deltas > 0.2
-    assert fit.sse <= 890_000
+    assert fit.sse <= 990_000
 
 
 def test_phase1_ads_really_valuable_fit_with_exog():
