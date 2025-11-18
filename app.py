@@ -1670,54 +1670,68 @@ def sidebar_inputs() -> SimulationInputs:
             )
         if fit is None:
             st.caption(
-                "No model fit available yet. Run Model fit on the Estimators tab or edit r below for simulations."
+                "No model fit yet. Using starter defaults below—run Model fit on the Estimators tab when ready."
             )
-        else:
-            try:
-                k_val = number_input_state(
-                    "K (carrying capacity)",
-                    min_value=0.0,
-                    default_value=_safe_float(getattr(fit, "carrying_capacity", None), 0.0),
-                    step=100.0,
-                    key="modelfit_K",
-                )
-                gp = number_input_state(
-                    "gamma_pulse",
+        try:
+            inferred_k = None
+            with suppress(Exception):
+                import_total = st.session_state.get("import_total")
+                if isinstance(import_total, pd.Series) and not import_total.empty:
+                    inferred_k = float(import_total.max() * 1.25)
+            k_default = _safe_float(
+                st.session_state.get("modelfit_K"),
+                _safe_float(getattr(fit, "carrying_capacity", None), inferred_k or 20000.0),
+            )
+            k_val = number_input_state(
+                "K (carrying capacity)",
+                min_value=0.0,
+                default_value=float(k_default),
+                step=100.0,
+                key="modelfit_K",
+            )
+            gp_default = _safe_float(
+                st.session_state.get("modelfit_gamma_pulse"), _safe_float(getattr(fit, "gamma_pulse", None), 0.0)
+            )
+            gp = number_input_state(
+                "gamma_pulse",
+                min_value=-10.0,
+                max_value=10.0,
+                default_value=float(gp_default),
+                step=0.001,
+                key="modelfit_gamma_pulse",
+            )
+            gs_default = _safe_float(
+                st.session_state.get("modelfit_gamma_step"), _safe_float(getattr(fit, "gamma_step", None), 0.0)
+            )
+            gs = number_input_state(
+                "gamma_step",
+                min_value=-10.0,
+                max_value=10.0,
+                default_value=float(gs_default),
+                step=0.001,
+                key="modelfit_gamma_step",
+            )
+            gx0 = st.session_state.get("modelfit_gamma_exog", getattr(fit, "gamma_exog", None))
+            if gx0 is not None:
+                gx = number_input_state(
+                    "gamma_exog (log ad)",
                     min_value=-10.0,
                     max_value=10.0,
-                    default_value=_safe_float(getattr(fit, "gamma_pulse", None), 0.0),
+                    default_value=_safe_float(gx0, 0.0),
                     step=0.001,
-                    key="modelfit_gamma_pulse",
+                    key="modelfit_gamma_exog",
                 )
-                gs = number_input_state(
-                    "gamma_step",
-                    min_value=-10.0,
-                    max_value=10.0,
-                    default_value=_safe_float(getattr(fit, "gamma_step", None), 0.0),
-                    step=0.001,
-                    key="modelfit_gamma_step",
-                )
-                gx0 = getattr(fit, "gamma_exog", None)
-                if gx0 is not None:
-                    gx = number_input_state(
-                        "gamma_exog (log ad)",
-                        min_value=-10.0,
-                        max_value=10.0,
-                        default_value=_safe_float(gx0, 0.0),
-                        step=0.001,
-                        key="modelfit_gamma_exog",
-                    )
 
-                # Segment growth rates r_j
-                base_r_list = coerce_list(st.session_state.get("modelfit_r"))
-                logger.info("Initial base_r_list from session state: %s", base_r_list)
-                if not base_r_list:
-                    base_r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
-                    logger.info("Fallback base_r_list from fit: %s", base_r_list)
-            except Exception:
-                logger.exception("Model fit parameters available, but could not render editor. fit=%s", fit)
-                st.caption("Model fit parameters available, but could not render editor.")
-                base_r_list = []
+            # Segment growth rates r_j
+            base_r_list = coerce_list(st.session_state.get("modelfit_r"))
+            logger.info("Initial base_r_list from session state: %s", base_r_list)
+            if not base_r_list:
+                base_r_list = coerce_list(getattr(fit, "segment_growth_rates", None))
+                logger.info("Fallback base_r_list from fit: %s", base_r_list)
+        except Exception:
+            logger.exception("Model fit parameters available, but could not render editor. fit=%s", fit)
+            st.caption("Model fit parameters available, but could not render editor.")
+            base_r_list = []
         if fit is None:
             base_r_list = coerce_list(st.session_state.get("modelfit_r"))
         if not base_r_list:
