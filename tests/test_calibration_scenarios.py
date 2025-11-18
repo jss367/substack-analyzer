@@ -6,6 +6,7 @@ from substack_analyzer.detection import detect_change_points
 from substack_analyzer.scenarios import (
     mid_sized_seasonal_conference_series,
     niche_steady_series,
+    massive_spike_single_month_series,
     scenario_ads_really_valuable,
     small_breakout_series,
     top_tier_sustained_marketing_series,
@@ -84,3 +85,23 @@ def test_phase1_ads_really_valuable_fit_with_exog():
     # Deterministic construction; should explain nearly all variance in deltas
     assert fit.r2_on_deltas > 0.95
     assert fit.sse <= 50
+
+
+def test_massive_spike_with_external_event_has_grounded_growth_rate():
+    series, events_df = massive_spike_single_month_series(include_external_event=True)
+
+    fit = fit_piecewise_logistic(series, breakpoints=[], events_df=events_df)
+
+    assert len(fit.segment_growth_rates) == 1
+    assert abs(fit.segment_growth_rates[0]) < 0.01
+    assert fit.sse < 1.0
+
+
+def test_massive_spike_without_external_event_has_wild_growth_rate():
+    series, _events_df = massive_spike_single_month_series(include_external_event=False)
+
+    fit = fit_piecewise_logistic(series, breakpoints=[])
+
+    assert len(fit.segment_growth_rates) == 1
+    assert abs(fit.segment_growth_rates[0]) > 0.05
+    assert fit.sse > 1_000_000_000

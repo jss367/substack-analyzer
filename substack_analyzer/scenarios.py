@@ -414,6 +414,44 @@ def exog_with_nans_series_and_exog() -> tuple[pd.Series, pd.Series]:
     return s, exog_series.astype(float)
 
 
+def massive_spike_single_month_series(
+    include_external_event: bool = True,
+) -> tuple[pd.Series, pd.DataFrame | None]:
+    """
+    Series with steady growth that experiences a single, enormous one-month spike.
+
+    When ``include_external_event`` is True, the spike month is annotated as a
+    transient external event so calibration can attribute the jump to
+    ``gamma_pulse``. When False, the fitter must explain the jump organically,
+    which leads to unrealistic growth-rate estimates.
+    """
+
+    idx = pd.period_range("2023-01", periods=18, freq="M").to_timestamp("M")
+
+    # Steady organic growth punctuated by a one-time surge in the 9th delta
+    start = 20_000.0
+    deltas = [1_200.0] * (len(idx) - 1)
+    spike_delta_idx = 8
+    deltas[spike_delta_idx] = 120_000.0
+
+    vals = [start]
+    for delta in deltas:
+        vals.append(vals[-1] + delta)
+    series = pd.Series(vals, index=idx)
+
+    events_df: pd.DataFrame | None = None
+    if include_external_event:
+        events_df = pd.DataFrame(
+            {
+                "date": [idx[spike_delta_idx + 1]],
+                "type": ["external viral moment"],
+                "persistence": ["Transient"],
+            }
+        )
+
+    return series, events_df
+
+
 def three_breaks_mixed_persistence_params() -> dict:
     """
     Parameters and events for a synthetic series with three breakpoints and mixed persistence.
