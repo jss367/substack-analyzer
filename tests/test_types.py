@@ -8,8 +8,8 @@ def test_adspend_constant_and_two_stage():
 
     two = AdSpendSchedule.two_stage(3000.0, 1000.0)
     assert two.get_spend_for_month(0) == 3000.0
-    assert two.get_spend_for_month(23) == 3000.0
-    assert two.get_spend_for_month(24) == 1000.0
+    assert two.get_spend_for_month(11) == 3000.0
+    assert two.get_spend_for_month(12) == 1000.0
 
 
 def test_simulation_inputs_defaults():
