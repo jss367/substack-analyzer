@@ -67,13 +67,25 @@ def _plot_intercept_tradeoff(
 ) -> None:
     """Plot intercept tradeoff for a given series."""
     fit = fit_piecewise_logistic(series, breakpoints=breakpoints or [])
+    fit_legacy = fit_piecewise_logistic(
+        series, breakpoints=breakpoints or [], enable_breakpoint_level_shifts=False
+    )
 
     k = fit.carrying_capacity
     r_last = fit.segment_growth_rates[-1]
     intercept_last = fit.segment_intercepts[-1] if fit.segment_intercepts else fit.gamma_intercept
 
+    k_legacy = fit_legacy.carrying_capacity
+    r_last_legacy = fit_legacy.segment_growth_rates[-1]
+    intercept_last_legacy = (
+        fit_legacy.segment_intercepts[-1] if fit_legacy.segment_intercepts else fit_legacy.gamma_intercept
+    )
+
     future_idx = _extend_monthly_index(series.index, months_ahead)
     with_intercept = _forecast_with_terms(series.iat[-1], months_ahead, k, r_last, intercept=intercept_last)
+    legacy_projection = _forecast_with_terms(
+        series.iat[-1], months_ahead, k_legacy, r_last_legacy, intercept=intercept_last_legacy
+    )
 
     ax.plot(series.index, series.to_numpy(dtype=float), label="Actual history", color="black", linewidth=1.6)
     ax.plot(
@@ -83,7 +95,17 @@ def _plot_intercept_tradeoff(
         linestyle="-.",
         color="#1f77b4",
     )
-    ax.set_title(title)
+    ax.plot(
+        future_idx,
+        legacy_projection,
+        label=f"Legacy forecast (+ intercept {intercept_last_legacy:.0f}/mo)",
+        linestyle=":",
+        color="#d62728",
+    )
+    ax.set_title(
+        f"{title}\nΔS SSE: jumps={fit.sse:,.0f} · legacy={fit_legacy.sse:,.0f}",
+        fontsize=10,
+    )
     ax.set_ylabel("Subscribers")
     ax.legend(loc="upper left", fontsize=8)
     ax.grid(True, alpha=0.3)

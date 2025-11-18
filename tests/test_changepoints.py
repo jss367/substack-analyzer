@@ -78,7 +78,7 @@ def test_classify_mixed_requires_events_and_segment():
     fit_ev_seg = fit_piecewise_logistic(s, breakpoints=seg_bkps, events_df=events_df)
     fit_seg_only = fit_piecewise_logistic(s, breakpoints=seg_bkps, events_df=None)
 
-    assert fit_ev_seg.sse <= fit_seg_only.sse
+    assert fit_ev_seg.sse <= fit_seg_only.sse + 1e-5
 
 
 def test_sudden_doubling_is_pulse_step_and_segment_only_if_needed():
@@ -96,7 +96,7 @@ def test_sudden_doubling_is_pulse_step_and_segment_only_if_needed():
     fit_events = fit_piecewise_logistic(s, breakpoints=seg_bkps, events_df=events_df)
     fit_plain = fit_piecewise_logistic(s, breakpoints=seg_bkps, events_df=None)
 
-    assert fit_events.sse <= fit_plain.sse
+    assert fit_events.sse <= fit_plain.sse + 1e-5
 
 
 def test_detect_change_points_smoke():

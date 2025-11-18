@@ -16,7 +16,7 @@ import pandas as pd
 from substack_analyzer.analysis import build_events_features
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.changepoints import breakpoints_for_segments, detect_and_classify
-from substack_analyzer.plot_utils import plot_fit_vs_actual
+from substack_analyzer.plot_utils import plot_fit_comparison
 from substack_analyzer.scenarios import (
     cy_series_values,
     gm_series_values,
@@ -34,10 +34,36 @@ from substack_analyzer.utils_for_tests import ad_spend_csv_with_spikes, synthesi
 matplotlib.use("Agg")
 
 
+def _fit_pair(
+    series: pd.Series,
+    *,
+    breakpoints: list[int] | None = None,
+    events_df: pd.DataFrame | None = None,
+    extra_exog: pd.Series | None = None,
+):
+    fit = fit_piecewise_logistic(
+        series,
+        breakpoints=breakpoints or [],
+        events_df=events_df,
+        extra_exog=extra_exog,
+        enable_breakpoint_level_shifts=True,
+    )
+    fit_legacy = fit_piecewise_logistic(
+        series,
+        breakpoints=breakpoints or [],
+        events_df=events_df,
+        extra_exog=extra_exog,
+        enable_breakpoint_level_shifts=False,
+    )
+    return fit, fit_legacy
+
+
 def _build_series_with_bkps(ax: plt.Axes, title: str, series: pd.Series, bkps: list[int] | None) -> None:
-    fit = fit_piecewise_logistic(series, breakpoints=bkps or [])
-    subtitle = f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(series, fit, title=f"{title}\n{subtitle}", show_breakpoints=True, ax=ax, show=False)
+    fit, fit_legacy = _fit_pair(series, breakpoints=bkps)
+    subtitle = (
+        f"K={fit.carrying_capacity:.0f}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    )
+    plot_fit_comparison(series, fit, fit_legacy, title=f"{title}\n{subtitle}", show_breakpoints=True, ax=ax, show=False)
 
 
 def _build_top_tier_subplot(ax: plt.Axes) -> None:
@@ -64,19 +90,23 @@ def _build_gm_series_subplot(ax: plt.Axes) -> None:
     series = gm_series_values()
     classified = detect_and_classify(series, max_changes=4, window=6)
     bkps = breakpoints_for_segments(classified)
-    fit = fit_piecewise_logistic(series, breakpoints=bkps)
+    fit, fit_legacy = _fit_pair(series, breakpoints=bkps)
     title = (
-        f"gm_series (auto bkps {bkps})\nK={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+        "gm_series (auto bkps "
+        f"{bkps})\nK={fit.carrying_capacity:.0f}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
     )
-    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=True, ax=ax, show=False)
+    plot_fit_comparison(series, fit, fit_legacy, title=title, show_breakpoints=True, ax=ax, show=False)
 
 
 def _build_cy_series_subplot(ax: plt.Axes) -> None:
     series = cy_series_values()
     bkps = [16]
-    fit = fit_piecewise_logistic(series, breakpoints=bkps)
-    title = f"cy_series (bkps {bkps})\n" f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=True, ax=ax, show=False)
+    fit, fit_legacy = _fit_pair(series, breakpoints=bkps)
+    title = (
+        f"cy_series (bkps {bkps})\n"
+        f"K={fit.carrying_capacity:.0f}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    )
+    plot_fit_comparison(series, fit, fit_legacy, title=title, show_breakpoints=True, ax=ax, show=False)
 
 
 def _build_phase1_ads_spiky_subplot(ax: plt.Axes) -> None:
@@ -87,10 +117,13 @@ def _build_phase1_ads_spiky_subplot(ax: plt.Axes) -> None:
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
     total = synthesize_series_with_exog(idx, K=20000.0, r=0.15, exog=exog, g_exog=100.0)
-    fit = fit_piecewise_logistic(total_series=total, breakpoints=[], events_df=None, extra_exog=exog)
+    fit, fit_legacy = _fit_pair(total, extra_exog=exog)
     gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
-    title = f"ads_spiky_spend\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(total, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+    title = (
+        "ads_spiky_spend\n"
+        f"γ_exog={gamma_exog}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    )
+    plot_fit_comparison(total, fit, fit_legacy, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
 def _build_phase1_ads_valuable_subplot(ax: plt.Axes) -> None:
@@ -102,10 +135,12 @@ def _build_phase1_ads_valuable_subplot(ax: plt.Axes) -> None:
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
-    fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
+    fit, fit_legacy = _fit_pair(series, extra_exog=exog)
     gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
-    title = f"ads really valuable\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+    title = (
+        f"ads really valuable\nγ_exog={gamma_exog}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    )
+    plot_fit_comparison(series, fit, fit_legacy, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
 def _build_phase1_ads_no_effect_subplot(ax: plt.Axes) -> None:
@@ -117,10 +152,12 @@ def _build_phase1_ads_no_effect_subplot(ax: plt.Axes) -> None:
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
-    fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
+    fit, fit_legacy = _fit_pair(series, extra_exog=exog)
     gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
-    title = f"ads no effect\n" f"γ_exog={gamma_exog}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+    title = (
+        f"ads no effect\nγ_exog={gamma_exog}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    )
+    plot_fit_comparison(series, fit, fit_legacy, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
 def _build_phase1_ads_extremely_valuable_subplot(ax: plt.Axes) -> None:
@@ -132,18 +169,23 @@ def _build_phase1_ads_extremely_valuable_subplot(ax: plt.Axes) -> None:
     ad_file = ad_spend_csv_with_spikes(idx, spikes)
     _covariates_df, features_df = build_events_features(plot_df, ad_file=ad_file)
     exog = features_df["ad_effect_log"].astype(float)
-    fit = fit_piecewise_logistic(total_series=series, breakpoints=[], events_df=None, extra_exog=exog)
+    fit, fit_legacy = _fit_pair(series, extra_exog=exog)
     gamma_exog = f"{fit.gamma_exog:.1f}" if fit.gamma_exog is not None else "nan"
     lag_txt = f", lag={fit.exog_lag}" if getattr(fit, "exog_lag", None) is not None else ""
-    title = f"ads extremely valuable\n" f"γ_exog={gamma_exog}{lag_txt}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+    title = (
+        f"ads extremely valuable\nγ_exog={gamma_exog}{lag_txt}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    )
+    plot_fit_comparison(series, fit, fit_legacy, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
 def _build_one_time_spike_subplot(ax: plt.Axes) -> None:
     series, events = one_time_spike_series_and_events()
-    fit = fit_piecewise_logistic(series, breakpoints=[], events_df=events)
-    title = f"one_time_spike (events)\n" f"K={fit.carrying_capacity:.0f}, SSE={fit.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
-    plot_fit_vs_actual(series, fit, title=title, show_breakpoints=False, ax=ax, show=False)
+    fit, fit_legacy = _fit_pair(series, events_df=events)
+    title = (
+        "one_time_spike (events)\n"
+        f"K={fit.carrying_capacity:.0f}, ΔS SSE jumps={fit.sse:.1f} · legacy={fit_legacy.sse:.1f}, R2Δ={fit.r2_on_deltas:.3f}"
+    )
+    plot_fit_comparison(series, fit, fit_legacy, title=title, show_breakpoints=False, ax=ax, show=False)
 
 
 def main() -> None:

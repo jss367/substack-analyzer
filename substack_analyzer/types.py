@@ -17,6 +17,7 @@ class PiecewiseLogisticFit:
     segment_growth_rates: list[float]
     segment_intercepts: list[float]
     breakpoints: list[int]
+    breakpoint_level_shifts: list[float]
     gamma_pulse: float
     gamma_step: float
     fitted_series: pd.Series

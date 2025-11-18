@@ -950,14 +950,23 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if use_exog and isinstance(features_df, pd.DataFrame):
                 extra_exog = features_df["ad_effect_log"].astype(float)
 
-            # ----- fit -----
-            fit = fit_piecewise_logistic(
-                total_series=fit_series_source,
-                breakpoints=breakpoints,
-                events_df=st.session_state.get("events_df"),
-                extra_exog=extra_exog,
-            )
+            # ----- fit both the new and legacy behaviors -----
+            with st.spinner("Fitting piecewise logistic models..."):
+                fit = fit_piecewise_logistic(
+                    total_series=fit_series_source,
+                    breakpoints=breakpoints,
+                    events_df=st.session_state.get("events_df"),
+                    extra_exog=extra_exog,
+                )
+                legacy_fit = fit_piecewise_logistic(
+                    total_series=fit_series_source,
+                    breakpoints=breakpoints,
+                    events_df=st.session_state.get("events_df"),
+                    extra_exog=extra_exog,
+                    enable_breakpoint_level_shifts=False,
+                )
             st.session_state["pwlog_fit"] = fit
+            st.session_state["pwlog_fit_legacy"] = legacy_fit
 
             # ----- initialize sidebar override defaults if absent -----
             if "modelfit_K" not in st.session_state:
@@ -1066,26 +1075,44 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 gamma_step=float(gs_now),
                 gamma_exog=(float(gx_now) if gx_now is not None else None),
                 segment_intercepts=intercepts_now,
+                breakpoint_level_shifts=getattr(fit, "breakpoint_level_shifts", None),
             )
 
             # ----- overlay chart: Actual vs Fitted (overrides) -----
+            legacy_overlay = legacy_fit.fitted_series.reindex(fit_series_source.index)
             overlay_df = pd.DataFrame(
-                {"Actual": fit_series_source, "Fitted": fitted_from_overrides.reindex(fit_series_source.index)}
-            )
+                {
+                    "Actual": fit_series_source,
+                    "Fitted (with breakpoint jumps)": fitted_from_overrides.reindex(fit_series_source.index),
+                    "Fitted (legacy smooth)": legacy_overlay,
+                }
+            ).dropna(how="all")
             base_overlay = alt.Chart(overlay_df.reset_index().rename(columns={"index": "date"})).encode(
                 x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %Y"))
             )
-            actual_line = (
-                base_overlay.transform_fold(["Actual"], as_=["Series", "Value"])
+            overlay_chart = (
+                base_overlay.transform_fold(
+                    ["Actual", "Fitted (with breakpoint jumps)", "Fitted (legacy smooth)"], as_=["Series", "Value"]
+                )
                 .mark_line()
-                .encode(y="Value:Q", color=alt.Color("Series:N", scale=alt.Scale(range=["#1f77b4"])))
+                .encode(
+                    y="Value:Q",
+                    color=alt.Color(
+                        "Series:N",
+                        scale=alt.Scale(range=["#1f77b4", "#2ca02c", "#d62728"]),
+                        legend=alt.Legend(title=None),
+                    ),
+                    strokeDash=alt.StrokeDash(
+                        "Series",
+                        scale=alt.Scale(
+                            domain=["Actual", "Fitted (with breakpoint jumps)", "Fitted (legacy smooth)"],
+                            range=[[1, 0], [1, 0], [5, 3]],
+                        ),
+                    ),
+                )
+                .properties(height=260)
             )
-            fitted_line = (
-                base_overlay.transform_fold(["Fitted"], as_=["Series", "Value"])
-                .mark_line(strokeDash=[5, 3])
-                .encode(y="Value:Q", color=alt.Color("Series:N", scale=alt.Scale(range=["#ff7f0e"])))
-            )
-            st.altair_chart(alt.layer(actual_line, fitted_line).properties(height=240), width='stretch')
+            st.altair_chart(overlay_chart, width='stretch')
 
             # ----- metrics -----
             c1, c2, c3 = st.columns(3)
@@ -1099,10 +1126,52 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if getattr(fit, "gamma_exog", None) is not None:
                 st.caption(f"Exogenous effect: γ_exog={float(gx_now):0.4f}")
 
+            st.markdown("**Breakpoint jumps vs legacy (no jumps)**")
+            comparison_metrics = pd.DataFrame(
+                [
+                    {
+                        "Model": "With breakpoint jumps",
+                        "SSE on ΔS": float(fit.sse),
+                        "R² on ΔS": float(fit.r2_on_deltas),
+                    },
+                    {
+                        "Model": "Legacy smooth segments",
+                        "SSE on ΔS": float(legacy_fit.sse),
+                        "R² on ΔS": float(legacy_fit.r2_on_deltas),
+                    },
+                ]
+            )
+            st.dataframe(comparison_metrics.style.format({"SSE on ΔS": "{:.0f}", "R² on ΔS": "{:.3f}"}), use_container_width=True)
+
+            with suppress(Exception):
+                legacy_abs = legacy_fit.residuals.abs().reindex(fit.residuals.index)
+                jump_abs = fit.residuals.abs().reindex(fit.residuals.index)
+                improvement = legacy_abs - jump_abs
+                improve_df = pd.DataFrame(
+                    {"date": improvement.index, "Improvement vs legacy (Δ residual)": improvement.values}
+                ).dropna()
+                if not improve_df.empty:
+                    bar = (
+                        alt.Chart(improve_df)
+                        .mark_bar()
+                        .encode(
+                            x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %Y")),
+                            y=alt.Y("Improvement vs legacy (Δ residual):Q", title="Legacy abs resid − Jump abs resid"),
+                            color=alt.condition(
+                                alt.datum["Improvement vs legacy (Δ residual)"] > 0,
+                                alt.value("#2ca02c"),
+                                alt.value("#d62728"),
+                            ),
+                        )
+                        .properties(height=180)
+                    )
+                    st.altair_chart(bar, use_container_width=True)
+
             # ----- latex equation & stash for simulator tab -----
             eq = (
                 r"\Delta S_t = r_{seg(t)}\, S_{t-1} \left(1 - \frac{S_{t-1}}{K}\right) "
-                r"+ \alpha_{seg(t)} + \gamma_{pulse}\,pulse_t + \gamma_{step}\,step_t"
+                r"+ \alpha_{seg(t)} + \sum_{b} \delta_b\,\mathbf{1}_{t = \tau_b} "
+                r"+ \gamma_{pulse}\,pulse_t + \gamma_{step}\,step_t"
             )
             if getattr(fit, "gamma_exog", None) is not None:
                 eq += r" + \gamma_{exog}\,x_t"

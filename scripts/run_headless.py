@@ -36,6 +36,7 @@ from substack_analyzer.analysis import (
 )
 from substack_analyzer.calibration import fit_piecewise_logistic
 from substack_analyzer.changepoints import DetectionConfig, DetectionResult, filter_breakpoints, run_detection
+from substack_analyzer.plot_utils import plot_fit_comparison
 from substack_analyzer.persistence import export_phase_one_json
 from substack_analyzer.utils import coerce_list, ensure_month_end_index
 
@@ -398,6 +399,13 @@ def run(
         events_df=st.session_state.get("events_df"),
         extra_exog=exog,
     )
+    fit_legacy = fit_piecewise_logistic(
+        total_series=fit_series,
+        breakpoints=bkps,
+        events_df=st.session_state.get("events_df"),
+        extra_exog=exog,
+        enable_breakpoint_level_shifts=False,
+    )
     # Expose fit in session state so phase1.json export can include fit params
     st.session_state["pwlog_fit"] = fit
     try:
@@ -420,12 +428,15 @@ def run(
         "breakpoints_paid": (b_paid if 'b_paid' in locals() else None),
         "carrying_capacity": fit.carrying_capacity,
         "segment_growth_rates": fit.segment_growth_rates,
+        "breakpoint_level_shifts": fit.breakpoint_level_shifts,
         "gamma_pulse": fit.gamma_pulse,
         "gamma_step": fit.gamma_step,
         "gamma_exog": fit.gamma_exog,
         "gamma_intercept": fit.gamma_intercept,
         "sse": fit.sse,
         "r2_on_deltas": fit.r2_on_deltas,
+        "legacy_sse": fit_legacy.sse,
+        "legacy_r2_on_deltas": fit_legacy.r2_on_deltas,
         "estimates": est,
     }
     out_dir_path = Path(out_dir)
@@ -441,6 +452,19 @@ def run(
     except Exception:
         logger.exception("Failed to write fitted_series.csv")
         raise
+    try:
+        ax = plot_fit_comparison(
+            input_series=fit_series,
+            fit_with_shifts=fit,
+            fit_legacy=fit_legacy,
+            title="Actual vs fitted (breakpoint jumps vs legacy)",
+            show_breakpoints=False,
+        )
+        ax.figure.savefig(out_dir_path / "fit_comparison.png", bbox_inches="tight")
+        created_files.append("fit_comparison.png")
+        logger.info("Fit comparison plot saved: %s", str((out_dir_path / "fit_comparison.png").resolve()))
+    except Exception:
+        logger.exception("Failed to write fit_comparison.png")
     ev_out = st.session_state.get("events_df")
     if isinstance(ev_out, pd.DataFrame) and not ev_out.empty:
         ev_out.to_csv(out_dir_path / "events_normalized.csv", index=False)
@@ -464,7 +488,8 @@ def run(
     try:
         eq = (
             r"$\\Delta S_t = r_{seg(t)} \\, S_{t-1} \\left(1 - \\frac{S_{t-1}}{K}\\right) "
-            r"+ \\alpha_{seg(t)} + \\gamma_{pulse}\\,pulse_t + \\gamma_{step}\\,step_t$"
+            r"+ \\alpha_{seg(t)} + \sum_b \\delta_b\\,\mathbf{1}_{t = \\tau_b} "
+            r"+ \\gamma_{pulse}\\,pulse_t + \\gamma_{step}\\,step_t$"
         )
         if getattr(fit, "gamma_exog", None) is not None:
             eq = eq[:-1] + r" + \\gamma_{exog}\\,x_t$"
@@ -475,6 +500,7 @@ def run(
         gp = getattr(fit, "gamma_pulse", None)
         gs = getattr(fit, "gamma_step", None)
         gx = getattr(fit, "gamma_exog", None)
+        bp_level_shifts = coerce_list(getattr(fit, "breakpoint_level_shifts", None))
 
         lines: list[str] = []
         lines.append("# Growth equation (piecewise logistic)")
@@ -488,6 +514,11 @@ def run(
             lines.append("- Segment growth rates r_j: " + ", ".join(f"{r:0.3f}" for r in r_list))
         if intercept_list:
             lines.append("- Segment intercepts α_j: " + ", ".join(f"{a:0.3f}" for a in intercept_list))
+        if bp_level_shifts:
+            lines.append(
+                "- Breakpoint level shifts δ_b: "
+                + ", ".join(f"{shift:0.3f}" for shift in bp_level_shifts)
+            )
         if gp is not None:
             lines.append(f"- gamma_pulse: {float(gp):0.4f}")
         if gs is not None:
