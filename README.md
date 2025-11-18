@@ -28,7 +28,7 @@ Notes:
 ## What this does
 
 - Simulates monthly subscriber growth for free and premium cohorts
-- Combines organic growth, paid acquisition (ad spend / CAC), and churn
+- Combines organic growth, paid acquisition (ad spend / CAC with diminishing returns), and churn
 - Converts a share of new free subs to premium immediately, plus a small ongoing conversion of existing free
 - Computes net revenue after Substack (10%) and Stripe (3.6% + $0.30) fees
 - Tracks profit = net revenue − ad spend − ad manager fee

@@ -59,4 +59,32 @@ def test_carrying_capacity_replaces_churn_near_ceiling():
     assert tail.iloc[-1] >= tail.iloc[0]
 
 
+def test_paid_acquisition_has_diminishing_returns_with_adstock():
+    inputs = SimulationInputs(
+        starting_free_subscribers=0,
+        starting_premium_subscribers=0,
+        carrying_capacity=None,
+        horizon_months=3,
+        organic_monthly_growth_rate=0.0,
+        monthly_churn_rate_free=0.0,
+        monthly_churn_rate_premium=0.0,
+        new_subscriber_premium_conv_rate=0.0,
+        ongoing_premium_conv_rate=0.0,
+        cost_per_new_free_subscriber=1.0,
+        ad_spend_schedule=AdSpendSchedule.constant(10000.0),
+        ad_manager_monthly_fee=0.0,
+        adstock_lambda=0.5,
+        ad_log_theta=1000.0,
+    )
+
+    result = simulate_growth(inputs)
+    df = result.monthly
+
+    # With adstock + log response, each successive month should yield fewer paid new users
+    paid_new = df["new_free_paid"].tolist()
+    assert paid_new[0] > paid_new[1] > paid_new[2]
+    # And the effective acquisitions are far below the naive linear ad_spend/CAC assumption
+    assert max(paid_new) < 10000
+
+
 # end

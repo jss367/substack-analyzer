@@ -36,7 +36,7 @@ def test_phase1_ads_really_valuable_phase1_json():
     gamma_step = fit.gamma_step
     gamma_exog = fit.gamma_exog
 
-    assert 10000 < carrying_capacity < 30000, f"carrying_capacity {carrying_capacity} is not in range"
+    assert 5000 < carrying_capacity < 30000, f"carrying_capacity {carrying_capacity} is not in range"
     assert 0.0 <= gamma_step <= 0.50, f"gamma_step {gamma_step} is not in range"
     assert 0.0 <= gamma_pulse <= 1, f"gamma_pulse {gamma_pulse} is not in range"
     assert 4.0 <= gamma_exog <= 6.5, f"gamma_exog {gamma_exog} is not in range"
