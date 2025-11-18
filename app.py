@@ -33,6 +33,7 @@ from substack_analyzer.changepoints import (
 )
 from substack_analyzer.detection import compute_segment_slopes, slope_around
 from substack_analyzer.model import simulate_growth
+from substack_analyzer.faq import FAQ_ITEMS
 from substack_analyzer.persistence import (
     apply_phase_one_json,
     apply_session_bundle,
@@ -2040,6 +2041,13 @@ def render_help() -> None:
 Use the Estimators tab to turn exports into these inputs, then paste the results into the Simulator sidebar.
         """
     )
+
+    st.markdown("---")
+    st.subheader("Frequently asked questions")
+    for item in FAQ_ITEMS:
+        st.markdown(f"**{item['question']}**")
+        st.markdown(item["answer"])
+        st.write("")
 
 
 def render_save_load() -> None:
