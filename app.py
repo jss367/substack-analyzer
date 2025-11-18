@@ -1620,8 +1620,8 @@ def sidebar_inputs() -> SimulationInputs:
             key="annual_share",
         )
 
-    # Ad response feature parameters (used in Stage 2 feature building)
-    with st.sidebar.expander("Ad response (features)", expanded=False):
+    # Ad response feature parameters (used in Stage 2 feature building and the simulator)
+    with st.sidebar.expander("Ad response (features & simulator)", expanded=False):
         lam_sb = slider_state(
             "Adstock lambda (carryover)",
             min_value=0.0,
@@ -1812,6 +1812,8 @@ def sidebar_inputs() -> SimulationInputs:
         stripe_fee_pct=float(stripe_pct),
         stripe_flat_fee=float(stripe_flat),
         annual_share=float(annual_share),
+        adstock_lambda=float(lam_sb),
+        ad_log_theta=float(theta_sb),
     )
 
 

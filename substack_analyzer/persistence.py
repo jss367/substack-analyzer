@@ -62,6 +62,8 @@ def collect_session_bundle(include_fit: bool, include_sim: bool) -> bytes:
             "ad_const",
             "ad_one_time_amount",
             "ad_one_time_month",
+            "adstock_lambda",
+            "ad_log_theta",
             "est_window",
             "max_changes_detect",
         ]
