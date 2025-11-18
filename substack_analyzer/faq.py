@@ -2,6 +2,20 @@
 
 FAQ_ITEMS = [
     {
+        "question": "What is this value?",
+        "answer": (
+            "Key metrics shown in the app and what they mean:\n"
+            "- **Ending free / Ending premium**: Subscribers in each cohort in the last simulated month.\n"
+            "- **Net MRR**: Monthly recurring revenue after Substack and Stripe fees from monthly subscribers.\n"
+            "- **Cumulative profit**: Sum of monthly profit (net revenue minus ad spend and ad manager fee) over time.\n"
+            "- **Cumulative ad spend**: Total advertising spend across all simulated months.\n"
+            "- **ROAS (net revenue / ad spend)**: Net revenue divided by total ad spend, showing revenue efficiency of ads.\n"
+            "- **Blended CAC (paid only)**: Total ad spend divided by the number of new free subscribers attributed to ads.\n"
+            "- **Payback month (cumulative)**: First month where cumulative profit turns positive.\n"
+            "- **Ad manager fee**: Monthly management fee applied only in months with ad spend; it reduces monthly profit."
+        ),
+    },
+    {
         "question": "How does the simulator move free subscribers to paid (and vice versa)?",
         "answer": (
             "Free cohorts upgrade to paid through two conversion rates in the deterministic equations: "
