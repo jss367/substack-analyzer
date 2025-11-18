@@ -98,6 +98,9 @@ class SimulationInputs:
     cost_per_new_free_subscriber: float = 2.00
     ad_spend_schedule: AdSpendSchedule = AdSpendSchedule.two_stage(3000.0, 1000.0)
     ad_manager_monthly_fee: float = 1500.0
+    # Diminishing returns parameters for paid acquisition
+    adstock_lambda: float = 0.5  # carryover of prior ad effectiveness
+    ad_log_theta: float = 500.0  # scale for log(1 + adstock/theta) response curve
 
     # Pricing & fees (monthly plan)
     premium_monthly_price_gross: float = 10.0
