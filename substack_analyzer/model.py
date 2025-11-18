@@ -65,6 +65,7 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
 
     cumulative_ad_spend = 0.0
     cumulative_net_profit = 0.0
+    prev_adstock = 0.0
 
     for m in months:
         # Beginning-of-month churn
@@ -87,11 +88,24 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
 
         # Paid acquisition (before capacity adjustment)
         ad_spend = float(input_params.ad_spend_schedule.get_spend_for_month(m))
-        paid_new = (
+
+        # Adstock with diminishing-returns response: log(1 + adstock/theta)
+        adstock = ad_spend + input_params.adstock_lambda * prev_adstock
+        prev_adstock = adstock
+
+        paid_new_base = (
             0.0
             if input_params.cost_per_new_free_subscriber <= 0
             else ad_spend / input_params.cost_per_new_free_subscriber
         )
+
+        if adstock > 0 and input_params.ad_log_theta > 0:
+            response = np.log1p(adstock / input_params.ad_log_theta)
+            diminishing_multiplier = response / (adstock / input_params.ad_log_theta)
+        else:
+            diminishing_multiplier = 0.0 if adstock <= 0 else 1.0
+
+        paid_new = paid_new_base * diminishing_multiplier
 
         # Apply capacity adjustment while ensuring churn replacement near the ceiling
         new_free_raw_total = new_free_organic_raw + paid_new
