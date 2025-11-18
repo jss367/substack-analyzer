@@ -360,7 +360,7 @@ def main() -> None:
         metavar=("STAGE1", "STAGE2"),
         type=float,
         default=None,
-        help="Two-stage spend (years 1-2, years 3-5)",
+        help="Two-stage spend (year 1 and year 2+)",
     )
     g.add_argument(
         "--spend-once", dest="spend_once", type=float, default=None, help="One-time ad spend in a single month"

@@ -53,12 +53,12 @@ class AdSpendSchedule:
         return AdSpendSchedule(lambda _m: float(monthly_spend))
 
     @staticmethod
-    def two_stage(years_1_to_2: float, years_3_to_5: float) -> "AdSpendSchedule":
+    def two_stage(year_1: float, year_2: float) -> "AdSpendSchedule":
         def _spend(month_index: int) -> float:
-            # Months are 0-indexed. Years 1-2: months 0..23, Years 3-5: months 24..59
-            if month_index < 24:
-                return float(years_1_to_2)
-            return float(years_3_to_5)
+            # Months are 0-indexed. Year 1: months 0..11, Year 2 and beyond: months 12+
+            if month_index < 12:
+                return float(year_1)
+            return float(year_2)
 
         return AdSpendSchedule(_spend)
 

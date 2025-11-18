@@ -1478,7 +1478,7 @@ def sidebar_inputs() -> SimulationInputs:
         )
 
     with st.sidebar.expander("Acquisition", expanded=True):
-        spend_mode_options = ["Two-stage (Years 1-2 / 3-5)", "Constant", "One-time"]
+        spend_mode_options = ["Two-stage (Year 1 / Year 2+)", "Constant", "One-time"]
         spend_mode_index = int(_get_state("spend_mode_index", 1))
         spend_mode_index = max(0, min(spend_mode_index, len(spend_mode_options) - 1))
         spend_mode = st.selectbox(
@@ -1490,14 +1490,14 @@ def sidebar_inputs() -> SimulationInputs:
         one_time_trigger_idx = None
         if spend_mode.startswith("Two-stage"):
             stage1 = number_input_state(
-                "Monthly ad spend (years 1-2)",
+                "Monthly ad spend (year 1)",
                 min_value=0.0,
                 default_value=float(_get_state("ad_stage1", 0.0)),
                 step=50.0,
                 key="ad_stage1",
             )
             stage2 = number_input_state(
-                "Monthly ad spend (years 3-5)",
+                "Monthly ad spend (year 2+)",
                 min_value=0.0,
                 default_value=float(_get_state("ad_stage2", 0.0)),
                 step=50.0,

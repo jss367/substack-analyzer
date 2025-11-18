@@ -49,7 +49,7 @@ Notes:
 - Pricing and fees:
   - Substack fee 10%, Stripe 3.6% + $0.30 are defaults; update as needed.
 - Ad spend schedule:
-  - Two-stage lets you specify a higher budget in years 1–2 and lower in years 3–5; constant uses a flat monthly spend.
+  - Two-stage lets you specify a budget for year 1 and a different budget for year 2 and beyond; constant uses a flat monthly spend.
 
 ## Notes and limitations (MVP)
 
