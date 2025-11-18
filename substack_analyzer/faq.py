@@ -1,8 +1,5 @@
 """Frequently asked questions content for the Help tab."""
 
-from __future__ import annotations
-
-
 FAQ_ITEMS = [
     {
         "question": "How does the simulator move free subscribers to paid (and vice versa)?",
@@ -23,14 +20,6 @@ FAQ_ITEMS = [
         ),
     },
     {
-        "question": "How should I choose the ad spend schedule inputs?",
-        "answer": (
-            "Use the two-stage schedule to set one monthly spend level for months 0–23 and another for months "
-            "24–59 when planning ramped campaigns. Use the constant spend option when you have a flat budget. "
-            "Both options drive the same cohort equations and CAC calculations."
-        ),
-    },
-    {
         "question": "What should I do before loading a session bundle?",
         "answer": (
             "If you import new data, first download the current bundle from Save / Load to avoid losing work. "
@@ -39,4 +28,3 @@ FAQ_ITEMS = [
         ),
     },
 ]
-
