@@ -1066,6 +1066,10 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 gamma_step=float(gs_now),
                 gamma_exog=(float(gx_now) if gx_now is not None else None),
                 segment_intercepts=intercepts_now,
+                segment_carrying_capacities=getattr(fit, "segment_carrying_capacities", None),
+                segment_gamma_pulse=getattr(fit, "segment_gamma_pulse", None),
+                segment_gamma_step=getattr(fit, "segment_gamma_step", None),
+                segment_gamma_exog=getattr(fit, "segment_gamma_exog", None),
             )
 
             # ----- overlay chart: Actual vs Fitted (overrides) -----

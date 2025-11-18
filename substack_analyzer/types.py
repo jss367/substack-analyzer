@@ -26,6 +26,11 @@ class PiecewiseLogisticFit:
     gamma_exog: float | None = None
     gamma_intercept: float = 0.0
     exog_lag: int | None = None
+    # Optional per-segment parameters (aligned to `segment_growth_rates` order)
+    segment_carrying_capacities: list[float] | None = None
+    segment_gamma_pulse: list[float] | None = None
+    segment_gamma_step: list[float] | None = None
+    segment_gamma_exog: list[float] | None = None
 
 
 @dataclass(frozen=True)
