@@ -78,7 +78,7 @@ def fit_piecewise_logistic(
     total_series: pd.Series,
     breakpoints: list[int],
     events_df: pd.DataFrame | None = None,
-    k_grid: Sequence[float] | None = None,
+    k_grid: Sequence[float] | Sequence[Sequence[float]] | None = None,
     extra_exog: pd.Series | None = None,
     exog_lags: Sequence[int] | None = None,
 ) -> PiecewiseLogisticFit:
@@ -143,6 +143,21 @@ def fit_piecewise_logistic(
                 np.linspace(baseline * 6.0 + eps, baseline * 10.0 + eps, 10),
             ]
         )
+        per_segment_k_grid = False
+        k_grid_per_segment: list[Sequence[float]] = [k_grid]
+    else:
+        # If callers pass a nested iterable, respect per-segment grids; otherwise treat values as shared
+        first_elem = next(iter(k_grid), None)  # type: ignore[arg-type]
+        if num_segments > 1 and isinstance(first_elem, Sequence):
+            per_segment_k_grid = True
+            k_grid_per_segment = [tuple(float(x) for x in seq) for seq in k_grid][:num_segments]  # type: ignore[misc]
+            if len(k_grid_per_segment) < num_segments:
+                last = k_grid_per_segment[-1] if k_grid_per_segment else (max_s,)  # type: ignore[misc]
+                k_grid_per_segment.extend([last] * (num_segments - len(k_grid_per_segment)))
+        else:
+            per_segment_k_grid = False
+            shared_grid = [float(x) for x in k_grid]
+            k_grid_per_segment = [shared_grid]
 
     best: PiecewiseLogisticFit | None = None
     best_sse = np.inf
@@ -182,8 +197,13 @@ def fit_piecewise_logistic(
     lam = 1e-6
 
     # Precompute base regressor per K to reuse across segment combinations
-    k_candidates = [float(k) for k in k_grid]
-    base_by_k = {k: s_lag_arr * (1.0 - s_lag_arr / k) for k in k_candidates}
+    unique_k_candidates: list[float] = []
+    for seq in k_grid_per_segment:
+        for val in seq:
+            k_val = float(val)
+            if k_val not in unique_k_candidates:
+                unique_k_candidates.append(k_val)
+    base_by_k = {k: s_lag_arr * (1.0 - s_lag_arr / k) for k in unique_k_candidates}
 
     from itertools import product
 
@@ -199,7 +219,14 @@ def fit_piecewise_logistic(
             + (num_segments if exog is not None else 0)
         )
         ridge_I = lam * np.eye(base_col_count)
-        for k_combo in product(k_candidates, repeat=num_segments):
+        if per_segment_k_grid:
+            k_combos = product(*k_grid_per_segment)
+        else:
+            # Shared K across all segments to avoid exploding the search space
+            shared_grid = k_grid_per_segment[0]
+            k_combos = ((k,) * num_segments for k in shared_grid)
+
+        for k_combo in k_combos:
             k_list = [float(k) for k in k_combo]
             # Build design matrix from precomputed masks
             X_cols: list[np.ndarray] = []
