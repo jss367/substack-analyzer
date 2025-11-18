@@ -115,7 +115,7 @@
             ]
         },
         {
-            "name": "Phase 2: $1k from phase1.json (minimal)",
+            "name": "Phase 2: One-time from phase1.json (minimal)",
             "type": "debugpy",
             "request": "launch",
             "program": "/Users/julius/git/substack-analyzer/scripts/run_simulator.py",
@@ -126,7 +126,7 @@
                 "--phase1",
                 "/Users/julius/git/substack-analyzer/outputs/phase1.json",
                 "--spend-once",
-                "1000"
+                "1000000"
             ]
         },
         {
