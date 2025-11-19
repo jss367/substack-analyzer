@@ -2,11 +2,11 @@
 
 ## How to use
 
-Open the hosted app: https://substackanalyzer.streamlit.app/ (just click to wake it up if it's gone to sleep)
+Open the hosted app: https://substackanalyzer.streamlit.app/ (just click to wake it up if it's gone to sleep). The Streamlit UI walks through Phase 1 (fit and diagnostics) and Phase 2 (simulation and outputs) with inline downloads and a Save / Load tab for session bundles.
 
 ### Headless (Python-only) runner
 
-You can run the core pipeline from CSV/XLSX files without the UI:
+You can run the Phase 1 pipeline from CSV/XLSX files without the UI:
 
 ```bash
 python scripts/run_headless.py \
@@ -14,16 +14,24 @@ python scripts/run_headless.py \
   --paid /path/to/paid.csv --paid-has-header --paid-date-col 0 --paid-count-col 1 \
   --events /path/to/events.csv \
   --adspend /path/to/ad_spend.csv \
-  --max-changes 4 --lam 0.5 --theta 500 \
+  --max-changes 4 --detect-on auto --detector classifier \
+  --lam 0.5 --theta 500 \
   --out-dir ./outputs
 ```
 
 Notes:
 
-- `--all` and/or `--paid` should each point to a two-column file (date, count). Use `--*-has-header` and `--*-date-col`/`--*-count-col` to specify header presence and column indices or names.
-- `--events` (optional) CSV columns: `date`, `type`, `persistence`, `cost`.
-- `--adspend` (optional) CSV/XLSX columns: `date`, `spend`.
-- Outputs include `summary.json`, `fitted_series.csv`, `features.csv`, and `covariates.csv` in `--out-dir`.
+- Provide at least one of `--all` or `--paid`. Each should point to a two-column file (date, count). Use `--*-has-header` and `--*-date-col`/`--*-count-col` to specify header presence and column indices or names.
+- `--events` (optional) CSV columns: `date`, `type`, `persistence`, `cost`. Events are encoded as pulse/step regressors for the logistic fit and saved to `events_normalized.csv` if present.
+- `--adspend` (optional) CSV/XLSX columns: `date`, `spend`. The ad stock/log-response parameters (`--lam`, `--theta`) control the exogenous regressor used in the fit.
+- Change-point detection matches the Streamlit app: `--detector classifier` (default) or `--detector simple`, `--detect-on` for total/paid/free/both, plus `--min-seg-len`, `--penalty-scale`, `--window`, and `--z-pulse` tuning knobs. Add `--keep-all-breaks` to skip classifier-based filtering of persistent breakpoints.
+- Outputs in `--out-dir` include:
+  - `summary.json`: detected breakpoints, fit parameters, fit diagnostics, and derived estimates.
+  - `fitted_series.csv`: deterministic piecewise-logistic fit on the supplied cadence.
+  - `covariates.csv` / `features.csv`: engineered regressors used in the fit.
+  - `events_normalized.csv`: cleaned events used for encoding (when provided).
+  - `equation.md`: human-readable growth equation with parameters and inputs.
+  - `phase1.json`: the portable artifact you can load into the app to proceed to the simulator.
 
 ## What this does
 
