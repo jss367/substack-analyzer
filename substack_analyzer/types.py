@@ -93,6 +93,7 @@ class SimulationInputs:
     organic_monthly_growth_rate: float = DEFAULT_GROWTH_RATE
     monthly_churn_rate_free: float = 0.01  # 1%
     monthly_churn_rate_premium: float = 0.01  # 1%
+    monthly_downgrade_rate_premium: float = 0.0  # share of premium who step down to free
 
     # Conversions
     new_subscriber_premium_conv_rate: float = 0.02  # 2% of new free subs
