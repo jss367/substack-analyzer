@@ -10,7 +10,9 @@ FAQ_ITEMS = [
             "- **Cumulative profit**: Sum of monthly profit (net revenue minus ad spend and ad manager fee) over time.\n"
             "- **Cumulative ad spend**: Total advertising spend across all simulated months.\n"
             "- **ROAS (net revenue / ad spend)**: Net revenue divided by total ad spend, showing revenue efficiency of ads.\n"
-            "- **Blended CAC (paid only)**: Total ad spend divided by the number of new free subscribers attributed to ads.\n"
+            "- **Blended free CAC (paid only)**: Free-attributed ad spend divided by the number of new free subscribers tagged as paid.\n"
+            "- **Blended premium CAC (paid only)**: Premium-attributed ad spend divided by premium subscribers added via paid campaigns.\n"
+            "- **Premium ad spend / Free ad spend**: Breakdown of the spend allocated to premium versus free acquisition schedules.\n"
             "- **Payback month (cumulative)**: First month where cumulative profit turns positive.\n"
             "- **Ad manager fee**: Monthly management fee applied only in months with ad spend; it reduces monthly profit."
         ),
