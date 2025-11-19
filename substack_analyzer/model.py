@@ -46,6 +46,7 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
         "free_churned",
         "premium_converted_from_new",
         "premium_converted_from_existing",
+        "premium_downgraded_to_free",
         "premium_churned",
         "ad_spend",
         "ad_spend_free",
@@ -75,9 +76,11 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
         # Beginning-of-month churn
         free_churned = free_subs * input_params.monthly_churn_rate_free
         premium_churned = premium_subs * input_params.monthly_churn_rate_premium
+        premium_downgraded_to_free = premium_subs * input_params.monthly_downgrade_rate_premium
 
-        free_subs -= free_churned
-        premium_subs -= premium_churned
+        free_subs = max(free_subs - free_churned, 0.0)
+        premium_subs = max(premium_subs - premium_churned - premium_downgraded_to_free, 0.0)
+        free_subs += premium_downgraded_to_free
 
         # Capacity pressure: scale organic/paid acquisition as the audience
         # approaches the inferred carrying capacity (if provided). Prefer
@@ -218,6 +221,7 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
                 free_churned,
                 convert_from_new,
                 convert_from_existing,
+                premium_downgraded_to_free,
                 premium_churned,
                 ad_spend_total,
                 ad_spend_free,
@@ -245,6 +249,7 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
         "free_churned",
         "premium_converted_from_new",
         "premium_converted_from_existing",
+        "premium_downgraded_to_free",
         "premium_churned",
         "new_premium_paid",
     ]

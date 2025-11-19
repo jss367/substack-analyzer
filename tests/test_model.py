@@ -139,4 +139,31 @@ def test_carrying_capacities_are_segment_specific():
     assert df["free_subscribers"].max() > 900
 
 
+def test_premium_downgrades_move_to_free_instead_of_churning_out():
+    inputs = SimulationInputs(
+        starting_free_subscribers=0,
+        starting_premium_subscribers=100,
+        horizon_months=1,
+        organic_monthly_growth_rate=0.0,
+        monthly_churn_rate_free=0.0,
+        monthly_churn_rate_premium=0.0,
+        monthly_downgrade_rate_premium=0.1,
+        new_subscriber_premium_conv_rate=0.0,
+        ongoing_premium_conv_rate=0.0,
+        cost_per_new_free_subscriber=0.0,
+        ad_spend_schedule=AdSpendSchedule.constant(0.0),
+        ad_manager_monthly_fee=0.0,
+    )
+
+    result = simulate_growth(inputs)
+    df = result.monthly
+
+    # 10 premium subscribers downgrade to free; none churn out, so totals stay constant
+    assert df["premium_downgraded_to_free"].iloc[0] == 10
+    assert df["premium_churned"].iloc[0] == 0
+    assert df["free_subscribers"].iloc[0] == 10
+    assert df["premium_subscribers"].iloc[0] == 90
+    assert df["total_subscribers"].iloc[0] == 100
+
+
 # end

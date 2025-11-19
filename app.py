@@ -1457,6 +1457,15 @@ def sidebar_inputs() -> SimulationInputs:
             format="%0.3f",
             key="churn_prem",
         )
+        downgrade_to_free = number_input_state(
+            "Paid downgrades to free",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=float(_get_state("downgrade_to_free", 0.0)),
+            step=0.001,
+            format="%0.3f",
+            key="downgrade_to_free",
+        )
 
     with st.sidebar.expander("Conversions", expanded=True):
         conv_new = number_input_state(
@@ -1854,6 +1863,7 @@ def sidebar_inputs() -> SimulationInputs:
         organic_monthly_growth_rate=organic_from_fit,
         monthly_churn_rate_free=float(churn_free),
         monthly_churn_rate_premium=float(churn_prem),
+        monthly_downgrade_rate_premium=float(downgrade_to_free),
         new_subscriber_premium_conv_rate=float(conv_new),
         ongoing_premium_conv_rate=float(conv_ongoing),
         cost_per_new_free_subscriber=float(cac),

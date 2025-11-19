@@ -18,7 +18,7 @@ This is the month-by-month operational projection that the simulator emits. Key 
 
 ### Monthly flows
 - `new_free_organic` and `new_free_paid` represent the inbound free subscribers each month. Month 1’s paid-acquired joins are still derived from the $1,000 spend at a $2 CAC, but the carrying-capacity factor now dampens how many of those signups “stick.” From month 2 onward only the organic channel contributes, and those gains taper as the base approaches saturation.【F:analysis/sim_once_1000_m1_explanation.md†L21-L25】
-- `free_churned` shows cancellations among free readers; `premium_converted_from_new` and `premium_converted_from_existing` convert a slice of the free base into paying members; `premium_churned` removes paying subscribers. All conversions start at zero from the new-acquisition cohort and slowly increase as the free base scales, while churn stays very low relative to gross adds in this scenario.【F:analysis/sim_once_1000_m1_explanation.md†L27-L30】
+- `free_churned` shows cancellations among free readers; `premium_converted_from_new` and `premium_converted_from_existing` convert a slice of the free base into paying members; `premium_downgraded_to_free` captures paid users who cancel but stay subscribed as free readers; `premium_churned` removes paying subscribers entirely. All conversions start at zero from the new-acquisition cohort and slowly increase as the free base scales, while churn stays very low relative to gross adds in this scenario.【F:analysis/sim_once_1000_m1_explanation.md†L27-L30】
 
 ### Spend and fees
 - `ad_spend` and `ad_manager_fee` capture marketing outlay. Only month 1 shows the $1,000 spend; subsequent months stay at zero because this is a single-shot campaign.【F:analysis/sim_once_1000_m1_explanation.md†L33-L34】
