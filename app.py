@@ -946,19 +946,45 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 st.info("Need Total or Free series to fit.")
                 return
 
+            # ----- check if dual-series fitting is available -----
+            use_dual_fit = False
+            paid_series_for_fit = None
+            if st.session_state.get("import_paid") is not None:
+                paid_series_for_fit = st.session_state["import_paid"]
+                use_dual_fit = st.checkbox(
+                    "Use dual-series fitting (fit free and premium separately)",
+                    value=True,
+                    help="When enabled, fits both free and premium series independently "
+                         "and infers conversion/churn rates from their relationship.",
+                )
+
             # ----- optional exogenous regressor -----
             extra_exog = None
             if use_exog and isinstance(features_df, pd.DataFrame):
                 extra_exog = features_df["ad_effect_log"].astype(float)
 
             # ----- fit -----
-            fit = fit_piecewise_logistic(
-                total_series=fit_series_source,
-                breakpoints=breakpoints,
-                events_df=st.session_state.get("events_df"),
-                extra_exog=extra_exog,
-            )
-            st.session_state["pwlog_fit"] = fit
+            if use_dual_fit and paid_series_for_fit is not None:
+                from substack_analyzer.calibration import fit_dual_series
+                dual_fit = fit_dual_series(
+                    free_series=fit_series_source,
+                    premium_series=paid_series_for_fit,
+                    breakpoints=breakpoints,
+                    events_df=st.session_state.get("events_df"),
+                    extra_exog=extra_exog,
+                )
+                st.session_state["dual_fit"] = dual_fit
+                # Also store the free fit in the old location for backward compat
+                fit = dual_fit.free_fit
+                st.session_state["pwlog_fit"] = fit
+            else:
+                fit = fit_piecewise_logistic(
+                    total_series=fit_series_source,
+                    breakpoints=breakpoints,
+                    events_df=st.session_state.get("events_df"),
+                    extra_exog=extra_exog,
+                )
+                st.session_state["pwlog_fit"] = fit
 
             # ----- initialize sidebar override defaults if absent -----
             if "modelfit_K" not in st.session_state:
