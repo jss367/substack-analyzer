@@ -76,3 +76,42 @@ def test_fit_dual_series_fits_both_independently():
     assert dual_fit.premium_fit.carrying_capacity > 0
     assert len(dual_fit.free_fit.segment_growth_rates) > 0
     assert len(dual_fit.premium_fit.segment_growth_rates) > 0
+
+
+def test_fit_dual_series_infers_conversion_rate():
+    """fit_dual_series should infer conversion rate from growth relationship."""
+    # Arrange: Free grows faster, premium grows from conversions
+    dates = pd.date_range("2023-01-31", periods=24, freq="ME")
+
+    # Simulate: Free grows 10% monthly, 5% convert to premium
+    free_base = 1000.0
+    free_values = []
+    premium_values = []
+    premium_base = 50.0
+
+    for month in range(24):
+        free_values.append(free_base)
+        premium_values.append(premium_base)
+
+        # Free growth: 10% organic growth
+        new_free = free_base * 0.10
+        # Conversions: 5% of free base converts to premium
+        conversions = free_base * 0.05
+
+        free_base += new_free - conversions
+        premium_base += conversions
+
+    free_series = pd.Series(free_values, index=dates, name="free")
+    premium_series = pd.Series(premium_values, index=dates, name="premium")
+
+    # Act: Fit and infer
+    dual_fit = fit_dual_series(
+        free_series=free_series,
+        premium_series=premium_series,
+        breakpoints=[],
+    )
+
+    # Assert: Should infer a conversion rate around 5%
+    assert dual_fit.inferred_conversion_rate is not None
+    # Allow generous tolerance since fitting may not be perfect
+    assert 0.01 <= dual_fit.inferred_conversion_rate <= 0.15

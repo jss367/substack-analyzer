@@ -623,6 +623,53 @@ def fitted_series_from_params(
     return pd.Series(s_hat, index=s.index)
 
 
+def _infer_conversion_rate(
+    free_series: pd.Series,
+    premium_series: pd.Series,
+    free_fit: PiecewiseLogisticFit,
+    premium_fit: PiecewiseLogisticFit,
+) -> float:
+    """Infer monthly conversion rate from free to premium.
+
+    Strategy: Look at premium growth (ΔP) relative to average free base (F).
+    If most premium growth comes from conversions, then:
+        ΔP ≈ conversion_rate * F
+    So: conversion_rate ≈ mean(ΔP / F)
+
+    Returns
+    -------
+    float
+        Estimated monthly conversion rate (e.g., 0.05 = 5% of free base converts per month).
+    """
+    # Align series to common monthly index
+    common_index = free_series.index.intersection(premium_series.index)
+    if len(common_index) < 3:
+        # Not enough data to infer
+        return 0.02  # Default fallback
+
+    free_aligned = free_series.reindex(common_index)
+    premium_aligned = premium_series.reindex(common_index)
+
+    # Premium growth (delta)
+    premium_deltas = premium_aligned.diff().dropna()
+
+    # Average free base in each period
+    free_lagged = free_aligned.shift(1).reindex(premium_deltas.index)
+
+    # Conversion rate estimates per month: ΔP / F_{t-1}
+    # Only use positive premium growth (negative could be churn)
+    valid_mask = (premium_deltas > 0) & (free_lagged > 0)
+    conversion_estimates = (premium_deltas / free_lagged).where(valid_mask)
+
+    # Take median to be robust to outliers
+    median_conversion = conversion_estimates.median()
+
+    # Clamp to reasonable range [0, 0.2]
+    if pd.isna(median_conversion):
+        return 0.02
+    return float(np.clip(median_conversion, 0.0, 0.2))
+
+
 def fit_dual_series(
     free_series: pd.Series,
     premium_series: pd.Series,
@@ -676,8 +723,16 @@ def fit_dual_series(
         exog_lags=exog_lags,
     )
 
-    # Return basic dual fit (parameter inference in next task)
+    # Infer parameters from the relationship between series
+    inferred_conversion = _infer_conversion_rate(
+        free_series=free_series,
+        premium_series=premium_series,
+        free_fit=free_fit,
+        premium_fit=premium_fit,
+    )
+
     return DualSeriesFit(
         free_fit=free_fit,
         premium_fit=premium_fit,
+        inferred_conversion_rate=inferred_conversion,
     )
