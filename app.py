@@ -1485,6 +1485,22 @@ def sidebar_inputs() -> SimulationInputs:
             key="horizon_months",
         )
 
+    # ----- Load inferred parameters from Phase 1 dual-fit if available -----
+    inferred_conversion = None
+    inferred_churn_free = None
+    inferred_churn_premium = None
+
+    if "dual_fit" in st.session_state:
+        dual_fit = st.session_state["dual_fit"]
+        inferred_conversion = dual_fit.inferred_conversion_rate
+        inferred_churn_free = dual_fit.inferred_churn_rate_free
+        inferred_churn_premium = dual_fit.inferred_churn_rate_premium
+
+        st.sidebar.info(
+            "Using inferred parameters from Phase 1 dual-series fit as defaults. "
+            "You can override them below."
+        )
+
     with st.sidebar.expander("Growth & churn", expanded=True):
         organic_growth = number_input_state(
             "Organic monthly growth (free)",
@@ -1499,7 +1515,7 @@ def sidebar_inputs() -> SimulationInputs:
             "Monthly churn (free)",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(_get_state("churn_free", 0.0)),
+            default_value=float(inferred_churn_free) if inferred_churn_free is not None else float(_get_state("churn_free", 0.01)),
             step=0.001,
             format="%0.3f",
             key="churn_free",
@@ -1508,7 +1524,7 @@ def sidebar_inputs() -> SimulationInputs:
             "Monthly churn (premium)",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(_get_state("churn_prem", 0.0)),
+            default_value=float(inferred_churn_premium) if inferred_churn_premium is not None else float(_get_state("churn_prem", 0.01)),
             step=0.001,
             format="%0.3f",
             key="churn_prem",
@@ -1528,7 +1544,7 @@ def sidebar_inputs() -> SimulationInputs:
             "New-subscriber premium conversion",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(_get_state("conv_new", 0.0)),
+            default_value=float(inferred_conversion) if inferred_conversion is not None else float(_get_state("conv_new", 0.02)),
             step=0.001,
             format="%0.3f",
             key="conv_new",
