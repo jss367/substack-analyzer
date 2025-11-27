@@ -623,6 +623,56 @@ def fitted_series_from_params(
     return pd.Series(s_hat, index=s.index)
 
 
+def _infer_churn_rate(
+    series: pd.Series,
+    fit: PiecewiseLogisticFit,
+) -> float:
+    """Infer monthly churn rate from fitted residuals.
+
+    Strategy: If the fitted model assumes no churn but actual growth is slower,
+    the residuals capture the drag from churn. We estimate churn as the
+    shortfall between predicted and actual growth.
+
+    Returns
+    -------
+    float
+        Estimated monthly churn rate (e.g., 0.02 = 2% churn per month).
+    """
+    # If the fit quality is poor, don't try to infer churn
+    if fit.r2_on_deltas < 0.5:
+        return 0.01  # Default fallback
+
+    # Look at the ratio of actual to predicted growth
+    # If actual < predicted consistently, there's likely churn
+    actual = series.diff().dropna()
+    predicted = fit.fitted_series.diff().dropna()
+
+    # Align indices
+    common_index = actual.index.intersection(predicted.index)
+    if len(common_index) < 3:
+        return 0.01
+
+    actual_aligned = actual.reindex(common_index)
+    predicted_aligned = predicted.reindex(common_index)
+
+    # Compute growth rates relative to base
+    series_lagged = series.shift(1).reindex(common_index)
+    actual_growth_rate = (actual_aligned / series_lagged).where(series_lagged > 0)
+    predicted_growth_rate = (predicted_aligned / series_lagged).where(series_lagged > 0)
+
+    # Churn is captured by the shortfall: predicted - actual
+    # (Positive means we predicted more growth than occurred)
+    shortfall = predicted_growth_rate - actual_growth_rate
+
+    # Take median shortfall as churn estimate
+    median_shortfall = shortfall.median()
+
+    # Clamp to reasonable range [0, 0.1]
+    if pd.isna(median_shortfall):
+        return 0.01
+    return float(np.clip(median_shortfall, 0.0, 0.1))
+
+
 def _infer_conversion_rate(
     free_series: pd.Series,
     premium_series: pd.Series,
@@ -731,8 +781,13 @@ def fit_dual_series(
         premium_fit=premium_fit,
     )
 
+    inferred_churn_free = _infer_churn_rate(free_series, free_fit)
+    inferred_churn_premium = _infer_churn_rate(premium_series, premium_fit)
+
     return DualSeriesFit(
         free_fit=free_fit,
         premium_fit=premium_fit,
         inferred_conversion_rate=inferred_conversion,
+        inferred_churn_rate_free=inferred_churn_free,
+        inferred_churn_rate_premium=inferred_churn_premium,
     )

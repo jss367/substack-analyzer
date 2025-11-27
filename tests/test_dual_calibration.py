@@ -115,3 +115,38 @@ def test_fit_dual_series_infers_conversion_rate():
     assert dual_fit.inferred_conversion_rate is not None
     # Allow generous tolerance since fitting may not be perfect
     assert 0.01 <= dual_fit.inferred_conversion_rate <= 0.15
+
+
+def test_fit_dual_series_infers_churn_rates():
+    """fit_dual_series should infer different churn rates for free vs premium."""
+    # Arrange: Series with different churn characteristics
+    dates = pd.date_range("2023-01-31", periods=24, freq="ME")
+
+    # Free: high churn (5% monthly), premium: low churn (1% monthly)
+    free_base = 1000.0
+    premium_base = 200.0
+    free_values = []
+    premium_values = []
+
+    for month in range(24):
+        free_values.append(free_base)
+        premium_values.append(premium_base)
+
+        # Growth minus churn
+        free_base = free_base * 1.10 * 0.95  # +10% growth, -5% churn
+        premium_base = premium_base * 1.05 * 0.99  # +5% growth, -1% churn
+
+    free_series = pd.Series(free_values, index=dates, name="free")
+    premium_series = pd.Series(premium_values, index=dates, name="premium")
+
+    # Act
+    dual_fit = fit_dual_series(
+        free_series=free_series,
+        premium_series=premium_series,
+        breakpoints=[],
+    )
+
+    # Assert: Free churn should be higher than premium churn
+    assert dual_fit.inferred_churn_rate_free is not None
+    assert dual_fit.inferred_churn_rate_premium is not None
+    assert dual_fit.inferred_churn_rate_free > dual_fit.inferred_churn_rate_premium
