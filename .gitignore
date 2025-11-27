@@ -4,3 +4,4 @@ __pycache__/
 /outputs
 .DS_Store
 /substack_analyzer.egg-info
+.worktrees/
