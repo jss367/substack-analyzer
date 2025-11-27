@@ -3,7 +3,7 @@ from typing import Sequence
 import numpy as np
 import pandas as pd
 
-from substack_analyzer.types import PiecewiseLogisticFit
+from substack_analyzer.types import PiecewiseLogisticFit, DualSeriesFit
 from substack_analyzer.utils import ensure_month_end_index
 
 
@@ -621,3 +621,63 @@ def fitted_series_from_params(
     for t in range(n):
         s_hat[t + 1] = max(s_hat[t] + y_hat[t], 0.0)
     return pd.Series(s_hat, index=s.index)
+
+
+def fit_dual_series(
+    free_series: pd.Series,
+    premium_series: pd.Series,
+    breakpoints: list[int],
+    events_df: pd.DataFrame | None = None,
+    k_grid: Sequence[float] | Sequence[Sequence[float]] | None = None,
+    extra_exog: pd.Series | None = None,
+    exog_lags: Sequence[int] | None = None,
+) -> DualSeriesFit:
+    """Fit piecewise logistic models to both free and premium series independently.
+
+    Parameters
+    ----------
+    free_series : pd.Series
+        Time series of free subscriber counts (monthly).
+    premium_series : pd.Series
+        Time series of premium subscriber counts (monthly).
+    breakpoints : list[int]
+        Change points to use for segmentation (applied to both series).
+    events_df : pd.DataFrame | None
+        Optional events table (applied to both series).
+    k_grid : Sequence[float] | Sequence[Sequence[float]] | None
+        Optional carrying capacity grid for search.
+    extra_exog : pd.Series | None
+        Optional exogenous regressor (e.g., ad spend).
+    exog_lags : Sequence[int] | None
+        Lags to try for exogenous regressor alignment.
+
+    Returns
+    -------
+    DualSeriesFit
+        Fit results for both series plus inferred parameters.
+    """
+    # Fit free series
+    free_fit = fit_piecewise_logistic(
+        total_series=free_series,
+        breakpoints=breakpoints,
+        events_df=events_df,
+        k_grid=k_grid,
+        extra_exog=extra_exog,
+        exog_lags=exog_lags,
+    )
+
+    # Fit premium series
+    premium_fit = fit_piecewise_logistic(
+        total_series=premium_series,
+        breakpoints=breakpoints,
+        events_df=events_df,
+        k_grid=k_grid,
+        extra_exog=extra_exog,
+        exog_lags=exog_lags,
+    )
+
+    # Return basic dual fit (parameter inference in next task)
+    return DualSeriesFit(
+        free_fit=free_fit,
+        premium_fit=premium_fit,
+    )
