@@ -34,6 +34,21 @@ class PiecewiseLogisticFit:
 
 
 @dataclass(frozen=True)
+class DualSeriesFit:
+    """
+    A fit of both free and premium subscriber series with inferred parameters.
+    """
+
+    free_fit: PiecewiseLogisticFit
+    premium_fit: PiecewiseLogisticFit
+
+    # Inferred parameters from the relationship between free and premium growth
+    inferred_conversion_rate: float | None = None
+    inferred_churn_rate_free: float | None = None
+    inferred_churn_rate_premium: float | None = None
+
+
+@dataclass(frozen=True)
 class SegmentSlope:
     start_index: int
     end_index: int
