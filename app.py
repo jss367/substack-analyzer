@@ -1130,6 +1130,36 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             if getattr(fit, "gamma_exog", None) is not None:
                 st.caption(f"Exogenous effect: γ_exog={float(gx_now):0.4f}")
 
+            # ----- Display dual-fit inferred parameters -----
+            if "dual_fit" in st.session_state:
+                dual_fit = st.session_state["dual_fit"]
+                st.subheader("Inferred Parameters from Dual-Series Fit")
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric(
+                        "Conversion Rate (monthly)",
+                        f"{dual_fit.inferred_conversion_rate:.2%}"
+                        if dual_fit.inferred_conversion_rate is not None else "N/A"
+                    )
+                with col2:
+                    st.metric(
+                        "Free Churn Rate (monthly)",
+                        f"{dual_fit.inferred_churn_rate_free:.2%}"
+                        if dual_fit.inferred_churn_rate_free is not None else "N/A"
+                    )
+                with col3:
+                    st.metric(
+                        "Premium Churn Rate (monthly)",
+                        f"{dual_fit.inferred_churn_rate_premium:.2%}"
+                        if dual_fit.inferred_churn_rate_premium is not None else "N/A"
+                    )
+
+                st.info(
+                    "💡 These parameters were inferred from the historical relationship "
+                    "between free and premium growth. They will be used as defaults in Phase 2."
+                )
+
             # ----- latex equation & stash for simulator tab -----
             eq = (
                 r"\Delta S_t = r_{seg(t)}\, S_{t-1} \left(1 - \frac{S_{t-1}}{K}\right) "
