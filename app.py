@@ -1688,11 +1688,34 @@ def sidebar_inputs() -> SimulationInputs:
             st.write("Representative monthly ad spend:", preview_rows)
 
     with st.sidebar.expander("Acquisition", expanded=True):
-        st.caption("Configure paid acquisition for free signups and premium-direct campaigns.")
-        ad_schedule, one_time_trigger_idx_free = _spend_controls("free", "Free")
-        premium_ad_schedule, one_time_trigger_idx_premium = _spend_controls("premium", "Premium")
-        _spend_preview(ad_schedule, one_time_trigger_idx_free, "Free")
-        _spend_preview(premium_ad_schedule, one_time_trigger_idx_premium, "Premium")
+        st.caption("Configure total paid acquisition budget and how it's allocated.")
+
+        # Single ad spend schedule for total budget
+        total_ad_schedule, one_time_trigger_idx = _spend_controls("total", "Total")
+
+        # Split percentage: how much goes to free vs premium acquisition
+        free_pct = slider_state(
+            "% allocated to free subscriber acquisition",
+            min_value=0.0,
+            max_value=100.0,
+            default_value=float(_get_state("ad_split_free_pct", 100.0)),
+            step=1.0,
+            key="ad_split_free_pct",
+            help="Percentage of ad budget for free signups (typical: 100%). Remaining goes to direct premium campaigns (rare).",
+        )
+
+        premium_pct = 100.0 - free_pct
+        if premium_pct > 0:
+            st.caption(f"Free: {free_pct:.0f}% | Premium direct: {premium_pct:.0f}%")
+
+        # Calculate split schedules from total schedule
+        def split_schedule(schedule: AdSpendSchedule, pct: float) -> AdSpendSchedule:
+            return AdSpendSchedule(lambda m: schedule.get_spend_for_month(m) * (pct / 100.0))
+
+        ad_schedule = split_schedule(total_ad_schedule, free_pct)
+        premium_ad_schedule = split_schedule(total_ad_schedule, premium_pct)
+
+        _spend_preview(total_ad_schedule, one_time_trigger_idx, "Total budget")
 
         cac = number_input_state(
             "Cost per new free subscriber (CAC)",
@@ -1993,12 +2016,13 @@ def render_kpis(df: pd.DataFrame) -> None:
     col8.metric("Payback month (cumulative)", "—" if math.isnan(payback_month) else str(int(payback_month)))
 
     col9, col10, col11, _ = st.columns(4)
-    premium_paid = df.new_premium_paid.sum() if "new_premium_paid" in df.columns else 0
-    premium_paid_spend = df.ad_spend_premium.sum() if "ad_spend_premium" in df.columns else 0
-    avg_cac_premium = float("nan") if premium_paid == 0 else premium_paid_spend / premium_paid
-    col9.metric("Blended premium CAC (paid only)", format_currency(avg_cac_premium))
-    col10.metric("Premium ad spend", format_currency(df.ad_spend_premium.sum()))
-    col11.metric("Free ad spend", format_currency(df.ad_spend_free.sum()))
+    total_ad_spend = df.ad_spend.sum()
+    free_ad_spend = df.ad_spend_free.sum()
+    premium_ad_spend = df.ad_spend_premium.sum()
+    free_pct_actual = 0.0 if total_ad_spend == 0 else (free_ad_spend / total_ad_spend * 100)
+    col9.metric("Total ad spend", format_currency(total_ad_spend))
+    col10.metric("Free ad spend", format_currency(free_ad_spend))
+    col11.metric("Premium ad spend", format_currency(premium_ad_spend))
 
 
 def render_charts(df: pd.DataFrame) -> None:
