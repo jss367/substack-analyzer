@@ -1942,8 +1942,6 @@ def sidebar_inputs() -> SimulationInputs:
         k_float = 0.0
     if k_float > 0:
         carrying_capacity = k_float
-    organic_from_fit = float(_r_now[-1]) if (_r_now and len(_r_now) > 0) else float(organic_growth)
-
     # Process carrying capacity values (inputs now in sidebar Free/Premium parameters expanders)
     carrying_capacity_free = float(capacity_free) if float(capacity_free or 0.0) > 0 else None
     carrying_capacity_premium = float(capacity_premium) if float(capacity_premium or 0.0) > 0 else None
@@ -1955,7 +1953,7 @@ def sidebar_inputs() -> SimulationInputs:
         carrying_capacity_free=carrying_capacity_free,
         carrying_capacity_premium=carrying_capacity_premium,
         horizon_months=horizon,
-        organic_monthly_growth_rate=organic_from_fit,
+        organic_monthly_growth_rate=float(organic_growth),
         monthly_churn_rate_free=float(churn_free),
         monthly_churn_rate_premium=float(churn_prem),
         monthly_downgrade_rate_premium=float(downgrade_to_free),
