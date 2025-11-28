@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import pytest
 from substack_analyzer.types import DualSeriesFit, PiecewiseLogisticFit
 from substack_analyzer.calibration import fit_dual_series
 
@@ -150,3 +151,37 @@ def test_fit_dual_series_infers_churn_rates():
     assert dual_fit.inferred_churn_rate_free is not None
     assert dual_fit.inferred_churn_rate_premium is not None
     assert dual_fit.inferred_churn_rate_free > dual_fit.inferred_churn_rate_premium
+
+
+def test_fit_dual_series_validates_input():
+    """fit_dual_series should validate that series have sufficient overlap."""
+    # Arrange: Create non-overlapping series
+    dates_free = pd.date_range("2023-01-31", periods=12, freq="ME")
+    dates_premium = pd.date_range("2024-01-31", periods=12, freq="ME")
+
+    free_series = pd.Series(range(12), index=dates_free, name="free")
+    premium_series = pd.Series(range(12), index=dates_premium, name="premium")
+
+    # Act & Assert: Should raise ValueError
+    with pytest.raises(ValueError, match="insufficient overlap"):
+        fit_dual_series(
+            free_series=free_series,
+            premium_series=premium_series,
+            breakpoints=[],
+        )
+
+
+def test_fit_dual_series_handles_short_series():
+    """fit_dual_series should fail gracefully with too-short series."""
+    # Arrange: Very short series (< 4 months)
+    dates = pd.date_range("2023-01-31", periods=3, freq="ME")
+    free_series = pd.Series([100, 110, 120], index=dates, name="free")
+    premium_series = pd.Series([10, 12, 14], index=dates, name="premium")
+
+    # Act & Assert: Should raise ValueError from underlying fit
+    with pytest.raises(ValueError, match="at least 4 months"):
+        fit_dual_series(
+            free_series=free_series,
+            premium_series=premium_series,
+            breakpoints=[],
+        )

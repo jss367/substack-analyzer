@@ -753,6 +753,16 @@ def fit_dual_series(
     DualSeriesFit
         Fit results for both series plus inferred parameters.
     """
+    # Validate series overlap
+    common_index = free_series.index.intersection(premium_series.index)
+    if len(common_index) < 4:
+        raise ValueError(
+            f"Free and premium series have insufficient overlap: only {len(common_index)} "
+            f"common months. Need at least 4 months of overlapping data."
+        )
+
+    # Note: Length validation (< 4 months) is handled by fit_piecewise_logistic
+
     # Fit free series
     free_fit = fit_piecewise_logistic(
         total_series=free_series,
