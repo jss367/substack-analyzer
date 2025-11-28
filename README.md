@@ -41,6 +41,7 @@ Notes:
 - Computes net revenue after Substack (10%) and Stripe (3.6% + $0.30) fees
 - Tracks profit = net revenue − ad spend − ad manager fee
 - Visualizes KPIs, subscribers over time, spend vs revenue
+- **Dual-Series Calibration**: When you have separate free and premium subscriber data, the tool fits both independently and automatically infers conversion rates, churn rates, and carrying capacities from their historical relationship. This gives you realistic parameter estimates for projections instead of requiring manual guesses.
 
 ## Mapping Substack stats to inputs
 

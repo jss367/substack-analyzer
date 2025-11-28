@@ -154,6 +154,43 @@ _Future work:_ richer automated documentation built from session artifacts.
 
 ---
 
+## Dual-Series Calibration
+
+### Overview
+
+When both free and premium subscriber historical data are available, the analyzer can fit them separately to infer realistic parameter values for simulation.
+
+### How It Works
+
+1. **Independent Fitting**: Both free and premium series are fit using piecewise logistic models
+2. **Parameter Inference**:
+   - **Conversion Rate**: Derived from `ΔPremium / Free_base` relationship
+   - **Churn Rates**: Estimated from residuals (shortfall between predicted and actual growth)
+   - **Carrying Capacities**: Taken directly from each fit's K parameter
+
+### Benefits
+
+- More accurate projections based on actual historical behavior
+- No need to manually guess conversion/churn rates
+- Separate carrying capacities for free vs premium growth
+
+### Data Requirements
+
+- Two CSV files: one for free subscribers (or total emails), one for premium (paid) subscribers
+- Both must have date and count columns
+- Overlapping date ranges preferred for accurate parameter inference
+
+### Usage in UI
+
+1. **Phase 1**: Load both free and premium data files
+2. Enable "Use dual-series fitting" checkbox
+3. Click "Fit Model"
+4. Review inferred parameters (conversion rate, churn rates)
+5. **Phase 2**: Inferred parameters automatically populate as defaults
+6. Run simulation with confidence in parameter realism
+
+---
+
 ## Out of Scope
 
 Any advanced probabilistic modeling workstreams are tracked separately and should
