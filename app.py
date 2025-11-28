@@ -1523,15 +1523,18 @@ def sidebar_inputs() -> SimulationInputs:
             key="churn_free",
             help="Fraction of free subscribers who unsubscribe monthly. Typical range: 0.01-0.05 (1-5%). Example: 0.015 = 1.5% monthly churn.",
         )
-        # Use fitted K from Phase 1 as default if available and not already set
-        capacity_free_default = float(_get_state("carrying_capacity_free", fitted_k if fitted_k else 0.0))
+        # Smart default for carrying capacity:
+        # 1. Use fitted K from Phase 1 if available
+        # 2. Otherwise, use 15x starting subscribers (minimum 50k)
+        smart_default_free = fitted_k if fitted_k else max(float(start_free) * 15, 50000.0)
+        capacity_free_default = float(_get_state("carrying_capacity_free", smart_default_free))
         capacity_free = number_input_state(
             "Carrying capacity (free) - optional",
             min_value=0.0,
             default_value=capacity_free_default,
             step=100.0,
             key="carrying_capacity_free",
-            help="Maximum free subscribers your publication can sustain (optional constraint). If you ran Phase 1 model fit, this defaults to the fitted capacity. Leave at 0 for unlimited growth. Example: 50000 = growth slows as you approach 50k free subs.",
+            help="Maximum free subscribers your publication can sustain. Defaults to 15x your starting subscribers (min 50k), or fitted capacity from Phase 1. Set to 0 for unlimited growth (not recommended for long-term projections).",
         )
 
     with st.sidebar.expander("Premium parameters", expanded=True):
@@ -1553,15 +1556,18 @@ def sidebar_inputs() -> SimulationInputs:
             key="churn_prem",
             help="Fraction of premium subscribers who cancel monthly. Typical range: 0.005-0.02 (0.5-2%). Example: 0.01 = 1% monthly cancellation rate.",
         )
-        # Use fitted K from Phase 1 as default if available and not already set
-        capacity_premium_default = float(_get_state("carrying_capacity_premium", fitted_k if fitted_k else 0.0))
+        # Smart default for carrying capacity:
+        # 1. Use fitted K from Phase 1 if available
+        # 2. Otherwise, use 15x starting subscribers (minimum 5k)
+        smart_default_premium = fitted_k if fitted_k else max(float(start_premium) * 15, 5000.0)
+        capacity_premium_default = float(_get_state("carrying_capacity_premium", smart_default_premium))
         capacity_premium = number_input_state(
             "Carrying capacity (premium) - optional",
             min_value=0.0,
             default_value=capacity_premium_default,
             step=100.0,
             key="carrying_capacity_premium",
-            help="Maximum premium subscribers your publication can sustain (optional constraint). If you ran Phase 1 model fit, this defaults to the fitted capacity. Leave at 0 for unlimited growth. Example: 5000 = growth slows as you approach 5k paid subs.",
+            help="Maximum premium subscribers your publication can sustain. Defaults to 15x your starting subscribers (min 5k), or fitted capacity from Phase 1. Set to 0 for unlimited growth (not recommended for long-term projections).",
         )
 
     with st.sidebar.expander("Conversions", expanded=False):
