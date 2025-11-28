@@ -978,6 +978,8 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 fit = dual_fit.free_fit
                 st.session_state["pwlog_fit"] = fit
             else:
+                # Clear any previous dual-fit when it is disabled or unavailable
+                st.session_state.pop("dual_fit", None)
                 fit = fit_piecewise_logistic(
                     total_series=fit_series_source,
                     breakpoints=breakpoints,
