@@ -985,6 +985,8 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     extra_exog=extra_exog,
                 )
                 st.session_state["pwlog_fit"] = fit
+                # Clear dual_fit when switching back to single-series mode
+                st.session_state.pop("dual_fit", None)
 
             # ----- initialize sidebar override defaults if absent -----
             if "modelfit_K" not in st.session_state:
