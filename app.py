@@ -989,8 +989,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 st.session_state.pop("dual_fit", None)
 
             # ----- initialize sidebar override defaults if absent -----
-            if "modelfit_K" not in st.session_state:
-                st.session_state["modelfit_K"] = _safe_float(getattr(fit, "carrying_capacity", None), 0.0)
+            # Note: Carrying capacity now migrated to free/premium capacities above
             if "modelfit_gamma_pulse" not in st.session_state:
                 st.session_state["modelfit_gamma_pulse"] = _safe_float(getattr(fit, "gamma_pulse", None), 0.0)
             if "modelfit_gamma_step" not in st.session_state:
@@ -1471,10 +1470,16 @@ def sidebar_inputs() -> SimulationInputs:
             key="horizon_months",
         )
 
-    # ----- Load inferred parameters from Phase 1 dual-fit if available -----
+    # ----- Load inferred parameters from Phase 1 fit if available -----
     inferred_conversion = None
     inferred_churn_free = None
     inferred_churn_premium = None
+    fitted_k = None
+
+    # Get fitted carrying capacity from Phase 1 model fit (for migration to free/premium capacities)
+    fit = st.session_state.get("pwlog_fit")
+    if fit is not None:
+        fitted_k = getattr(fit, "carrying_capacity", None)
 
     if "dual_fit" in st.session_state:
         dual_fit = st.session_state["dual_fit"]
@@ -1516,13 +1521,15 @@ def sidebar_inputs() -> SimulationInputs:
             key="churn_free",
             help="Fraction of free subscribers who unsubscribe monthly. Typical range: 0.01-0.05 (1-5%). Example: 0.015 = 1.5% monthly churn.",
         )
+        # Use fitted K from Phase 1 as default if available and not already set
+        capacity_free_default = float(_get_state("carrying_capacity_free", fitted_k if fitted_k else 0.0))
         capacity_free = number_input_state(
             "Carrying capacity (free) - optional",
             min_value=0.0,
-            default_value=float(_get_state("carrying_capacity_free", 0.0)),
+            default_value=capacity_free_default,
             step=100.0,
             key="carrying_capacity_free",
-            help="Maximum free subscribers your publication can sustain (optional constraint). Leave at 0 for unlimited growth. Example: 50000 = growth slows as you approach 50k free subs.",
+            help="Maximum free subscribers your publication can sustain (optional constraint). If you ran Phase 1 model fit, this defaults to the fitted capacity. Leave at 0 for unlimited growth. Example: 50000 = growth slows as you approach 50k free subs.",
         )
 
     with st.sidebar.expander("Premium parameters", expanded=True):
@@ -1544,13 +1551,15 @@ def sidebar_inputs() -> SimulationInputs:
             key="churn_prem",
             help="Fraction of premium subscribers who cancel monthly. Typical range: 0.005-0.02 (0.5-2%). Example: 0.01 = 1% monthly cancellation rate.",
         )
+        # Use fitted K from Phase 1 as default if available and not already set
+        capacity_premium_default = float(_get_state("carrying_capacity_premium", fitted_k if fitted_k else 0.0))
         capacity_premium = number_input_state(
             "Carrying capacity (premium) - optional",
             min_value=0.0,
-            default_value=float(_get_state("carrying_capacity_premium", 0.0)),
+            default_value=capacity_premium_default,
             step=100.0,
             key="carrying_capacity_premium",
-            help="Maximum premium subscribers your publication can sustain (optional constraint). Leave at 0 for unlimited growth. Example: 5000 = growth slows as you approach 5k paid subs.",
+            help="Maximum premium subscribers your publication can sustain (optional constraint). If you ran Phase 1 model fit, this defaults to the fitted capacity. Leave at 0 for unlimited growth. Example: 5000 = growth slows as you approach 5k paid subs.",
         )
 
     with st.sidebar.expander("Conversions", expanded=False):
@@ -1782,8 +1791,7 @@ def sidebar_inputs() -> SimulationInputs:
         fit = st.session_state.get("pwlog_fit")
         if fit is not None:
             logger.info(
-                "Rendering model fit parameters: carrying_capacity=%s, gamma_pulse=%s, gamma_step=%s, gamma_exog=%s",
-                getattr(fit, "carrying_capacity", None),
+                "Rendering model fit parameters: gamma_pulse=%s, gamma_step=%s, gamma_exog=%s",
                 getattr(fit, "gamma_pulse", None),
                 getattr(fit, "gamma_step", None),
                 getattr(fit, "gamma_exog", None),
@@ -1793,22 +1801,8 @@ def sidebar_inputs() -> SimulationInputs:
                 "No model fit yet. Using starter defaults below—run Model fit on the Estimators tab when ready."
             )
         try:
-            inferred_k = None
-            with suppress(Exception):
-                import_total = st.session_state.get("import_total")
-                if isinstance(import_total, pd.Series) and not import_total.empty:
-                    inferred_k = float(import_total.max() * 1.25)
-            k_default = _safe_float(
-                st.session_state.get("modelfit_K"),
-                _safe_float(getattr(fit, "carrying_capacity", None), inferred_k or 20000.0),
-            )
-            k_val = number_input_state(
-                "K (carrying capacity)",
-                min_value=0.0,
-                default_value=float(k_default),
-                step=100.0,
-                key="modelfit_K",
-            )
+            # Note: Carrying capacity is now configured separately for free and premium
+            # in the Free/Premium parameters expanders above
             gp_default = _safe_float(
                 st.session_state.get("modelfit_gamma_pulse"), _safe_float(getattr(fit, "gamma_pulse", None), 0.0)
             )
@@ -1935,23 +1929,17 @@ def sidebar_inputs() -> SimulationInputs:
                 )
                 st.session_state["modelfit_r_last_logged"] = last_value
 
-    # Map model-fit overrides into simulator: use last segment r as organic growth if available
+    # Map model-fit overrides into simulator (r, gamma values only - carrying capacity now set above)
     _k_now, _r_now, _gp_now, _gs_now, _gx_now = _current_fit_params()
-    carrying_capacity = None
-    try:
-        k_float = float(_k_now)
-    except (TypeError, ValueError):
-        k_float = 0.0
-    if k_float > 0:
-        carrying_capacity = k_float
-    # Process carrying capacity values (inputs now in sidebar Free/Premium parameters expanders)
+
+    # Process carrying capacity values (set in Free/Premium parameters expanders above)
     carrying_capacity_free = float(capacity_free) if float(capacity_free or 0.0) > 0 else None
     carrying_capacity_premium = float(capacity_premium) if float(capacity_premium or 0.0) > 0 else None
 
     return SimulationInputs(
         starting_free_subscribers=start_free,
         starting_premium_subscribers=start_premium,
-        carrying_capacity=carrying_capacity,
+        carrying_capacity=None,  # No longer used - use free/premium specific capacities
         carrying_capacity_free=carrying_capacity_free,
         carrying_capacity_premium=carrying_capacity_premium,
         horizon_months=horizon,
