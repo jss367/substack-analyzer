@@ -4,7 +4,7 @@ from typing import Any, Callable
 import pandas as pd
 
 # Default organic monthly growth rate used across the app when no estimate is available
-DEFAULT_GROWTH_RATE: float = 0.10
+DEFAULT_GROWTH_RATE: float = 0.03  # 3% monthly organic growth for baseline scenario
 
 
 @dataclass(frozen=True)

@@ -1489,9 +1489,10 @@ def sidebar_inputs() -> SimulationInputs:
         start_free = number_input_state(
             "Starting free subscribers",
             min_value=0,
-            default_value=int(_get_state("start_free", 0)),
+            default_value=int(_get_state("start_free", 2500)),
             step=10,
             key="start_free",
+            help="Your current free subscriber count. Example: 2500 means you have 2,500 free subscribers today.",
         )
         organic_growth = number_input_state(
             "Organic monthly growth (free)",
@@ -1501,15 +1502,17 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.001,
             format="%0.3f",
             key="organic_growth",
+            help="Monthly growth rate for free subscribers (excluding paid acquisition). Typical range: 0.02-0.05 (2-5%). Example: 0.03 = 3% organic growth per month.",
         )
         churn_free = number_input_state(
             "Monthly churn (free)",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(inferred_churn_free) if inferred_churn_free is not None else float(_get_state("churn_free", 0.01)),
+            default_value=float(inferred_churn_free) if inferred_churn_free is not None else float(_get_state("churn_free", 0.015)),
             step=0.001,
             format="%0.3f",
             key="churn_free",
+            help="Fraction of free subscribers who unsubscribe monthly. Typical range: 0.01-0.05 (1-5%). Example: 0.015 = 1.5% monthly churn.",
         )
         capacity_free = number_input_state(
             "Carrying capacity (free) - optional",
@@ -1517,15 +1520,17 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("carrying_capacity_free", 0.0)),
             step=100.0,
             key="carrying_capacity_free",
+            help="Maximum free subscribers your publication can sustain (optional constraint). Leave at 0 for unlimited growth. Example: 50000 = growth slows as you approach 50k free subs.",
         )
 
     with st.sidebar.expander("Premium parameters", expanded=True):
         start_premium = number_input_state(
             "Starting premium subscribers",
             min_value=0,
-            default_value=int(_get_state("start_premium", 0)),
+            default_value=int(_get_state("start_premium", 150)),
             step=1,
             key="start_premium",
+            help="Your current paid subscriber count. Example: 150 means you have 150 paying subscribers today.",
         )
         churn_prem = number_input_state(
             "Monthly churn (premium)",
@@ -1535,6 +1540,7 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.001,
             format="%0.3f",
             key="churn_prem",
+            help="Fraction of premium subscribers who cancel monthly. Typical range: 0.005-0.02 (0.5-2%). Example: 0.01 = 1% monthly cancellation rate.",
         )
         capacity_premium = number_input_state(
             "Carrying capacity (premium) - optional",
@@ -1542,6 +1548,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("carrying_capacity_premium", 0.0)),
             step=100.0,
             key="carrying_capacity_premium",
+            help="Maximum premium subscribers your publication can sustain (optional constraint). Leave at 0 for unlimited growth. Example: 5000 = growth slows as you approach 5k paid subs.",
         )
 
     with st.sidebar.expander("Conversions", expanded=False):
@@ -1553,15 +1560,17 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.001,
             format="%0.3f",
             key="conv_new",
+            help="Share of newly acquired free subscribers who convert to premium immediately. Typical range: 0.01-0.05 (1-5%). Example: 0.02 = 2% of new free subs become paid.",
         )
         conv_ongoing = number_input_state(
             "Ongoing premium conversion of existing free",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(_get_state("conv_ongoing", 0.0)),
+            default_value=float(_get_state("conv_ongoing", 0.0002)),
             step=0.0001,
             format="%0.4f",
             key="conv_ongoing",
+            help="Monthly conversion rate for existing free subscriber base. Typical range: 0.0001-0.0005 (0.01-0.05%). Example: 0.0002 = 0.02% of existing free convert monthly.",
         )
 
     with st.sidebar.expander("Downgrades", expanded=False):
@@ -1573,6 +1582,7 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.001,
             format="%0.3f",
             key="downgrade_to_free",
+            help="Fraction of premium subscribers who downgrade to free monthly (instead of canceling entirely). Typical range: 0-0.01 (0-1%). Example: 0.005 = 0.5% downgrade monthly.",
         )
 
     def _spend_controls(prefix: str, label_prefix: str, default_index: int = 1) -> tuple[AdSpendSchedule, int | None]:
@@ -1668,16 +1678,18 @@ def sidebar_inputs() -> SimulationInputs:
         cac = number_input_state(
             "Cost per new free subscriber (CAC)",
             min_value=0.01,
-            default_value=float(_get_state("cac", 2.0)),
+            default_value=float(_get_state("cac", 100.0)),
             step=0.1,
             key="cac",
+            help="Average cost to acquire one free subscriber through paid ads. Typical range: $50-$200 depending on niche and platform. Example: $100 = each free signup costs $100 in ad spend.",
         )
         cac_premium = number_input_state(
             "Cost per new premium subscriber (direct CAC)",
             min_value=0.01,
-            default_value=float(_get_state("cac_premium", 10.0)),
+            default_value=float(_get_state("cac_premium", 200.0)),
             step=0.5,
             key="cac_premium",
+            help="Average cost to acquire one premium subscriber directly (not via free conversion). Typical range: $150-$400. Example: $200 = each direct premium signup costs $200.",
         )
         ad_manager_fee = number_input_state(
             "Ad manager monthly fee",
@@ -1685,6 +1697,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("ad_manager_fee", 0.0)),
             step=50.0,
             key="ad_manager_fee",
+            help="Fixed monthly cost for ad management services or tools. Leave at 0 if you manage ads yourself. Example: $500 = monthly agency fee.",
         )
 
     with st.sidebar.expander("Pricing & fees", expanded=True):
@@ -1694,6 +1707,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("price_monthly", 10.0)),
             step=1.0,
             key="price_monthly",
+            help="Monthly subscription price before fees. Typical range: $5-$15 for most newsletters. Example: $10/month.",
         )
         price_annual = number_input_state(
             "Premium annual price (gross)",
@@ -1701,6 +1715,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("price_annual", 70.0)),
             step=5.0,
             key="price_annual",
+            help="Annual subscription price before fees (typically 2-3 months discount vs monthly). Example: $70/year = ~$5.83/month, 42% savings vs $10/month.",
         )
         substack_pct = number_input_state(
             "Substack fee %",
@@ -1710,6 +1725,7 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.01,
             format="%0.2f",
             key="substack_pct",
+            help="Substack's platform fee as a decimal. Standard is 0.10 (10% of subscription revenue).",
         )
         stripe_pct = number_input_state(
             "Stripe % (billing + card)",
@@ -1719,6 +1735,7 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.001,
             format="%0.3f",
             key="stripe_pct",
+            help="Stripe's percentage fee for payment processing. Standard is 0.036 (3.6%).",
         )
         stripe_flat = number_input_state(
             "Stripe flat per transaction",
@@ -1726,6 +1743,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("stripe_flat", 0.30)),
             step=0.05,
             key="stripe_flat",
+            help="Stripe's fixed fee per transaction. Standard is $0.30 per payment.",
         )
         annual_share = slider_state(
             "Share of premium on annual plans",
@@ -1734,6 +1752,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("annual_share", 0.0)),
             step=0.05,
             key="annual_share",
+            help="Fraction of premium subscribers on annual plans. Example: 0.3 = 30% of paid subs pay annually, 70% pay monthly.",
         )
 
     # Ad response feature parameters (used in Stage 2 feature building and the simulator)
@@ -1745,6 +1764,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("adstock_lambda", DEFAULT_ADSTOCK_LAMBDA)),
             step=0.01,
             key="adstock_lambda",
+            help="How much ad effects carry over to future months (adstock decay rate). 0 = no carryover, 0.5 = moderate persistence, 0.9 = strong long-term effects. Typical: 0.3-0.7.",
         )
         theta_sb = number_input_state(
             "Log transform theta",
@@ -1752,6 +1772,7 @@ def sidebar_inputs() -> SimulationInputs:
             default_value=float(_get_state("ad_log_theta", DEFAULT_AD_LOG_THETA)),
             step=50.0,
             key="ad_log_theta",
+            help="Diminishing returns parameter for ad spend. Higher values = more aggressive diminishing returns. Typical: 200-800. Example: 500 = moderate saturation effect.",
         )
 
     # Model fit parameters (read from fit; allow manual override for what-if scenarios)
@@ -2400,6 +2421,11 @@ def render_data_import() -> None:
     st.caption(
         "Upload two files: All subscribers over time, and Paid subscribers over time. "
         "We normalize everything to end-of-month (monthly). No headers by default: first column is date, second is count."
+    )
+
+    st.info(
+        "💡 Want to explore projections without historical data? "
+        "Skip to the **Simulator** tab to start with example parameters."
     )
 
     logger.info("Stage 1: entering Data Import")
