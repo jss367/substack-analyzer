@@ -1458,23 +1458,7 @@ def sidebar_inputs() -> SimulationInputs:
             last_r_caption = f"{float(r_overrides[-1]):0.3f}"
         st.sidebar.caption(f"Last segment r: {last_r_caption}. Edit under Model fit parameters.")
 
-    with st.sidebar.expander("Starting point", expanded=True):
-        start_free = number_input_state(
-            "Starting free subscribers",
-            min_value=0,
-            default_value=int(_get_state("start_free", 0)),
-            step=10,
-            key="start_free",
-        )
-        start_premium = number_input_state(
-            "Starting premium subscribers",
-            min_value=0,
-            default_value=int(_get_state("start_premium", 0)),
-            step=1,
-            key="start_premium",
-        )
-
-    with st.sidebar.expander("Horizon", expanded=False):
+    with st.sidebar.expander("Horizon", expanded=True):
         horizon_default = int(_get_state("horizon_months", 24))
         horizon = slider_state(
             "Months to simulate",
@@ -1501,7 +1485,14 @@ def sidebar_inputs() -> SimulationInputs:
             "You can override them below."
         )
 
-    with st.sidebar.expander("Growth & churn", expanded=True):
+    with st.sidebar.expander("Free parameters", expanded=True):
+        start_free = number_input_state(
+            "Starting free subscribers",
+            min_value=0,
+            default_value=int(_get_state("start_free", 0)),
+            step=10,
+            key="start_free",
+        )
         organic_growth = number_input_state(
             "Organic monthly growth (free)",
             min_value=0.0,
@@ -1520,6 +1511,22 @@ def sidebar_inputs() -> SimulationInputs:
             format="%0.3f",
             key="churn_free",
         )
+        capacity_free = number_input_state(
+            "Carrying capacity (free) - optional",
+            min_value=0.0,
+            default_value=float(_get_state("carrying_capacity_free", 0.0)),
+            step=100.0,
+            key="carrying_capacity_free",
+        )
+
+    with st.sidebar.expander("Premium parameters", expanded=True):
+        start_premium = number_input_state(
+            "Starting premium subscribers",
+            min_value=0,
+            default_value=int(_get_state("start_premium", 0)),
+            step=1,
+            key="start_premium",
+        )
         churn_prem = number_input_state(
             "Monthly churn (premium)",
             min_value=0.0,
@@ -1529,17 +1536,15 @@ def sidebar_inputs() -> SimulationInputs:
             format="%0.3f",
             key="churn_prem",
         )
-        downgrade_to_free = number_input_state(
-            "Paid downgrades to free",
+        capacity_premium = number_input_state(
+            "Carrying capacity (premium) - optional",
             min_value=0.0,
-            max_value=1.0,
-            default_value=float(_get_state("downgrade_to_free", 0.0)),
-            step=0.001,
-            format="%0.3f",
-            key="downgrade_to_free",
+            default_value=float(_get_state("carrying_capacity_premium", 0.0)),
+            step=100.0,
+            key="carrying_capacity_premium",
         )
 
-    with st.sidebar.expander("Conversions", expanded=True):
+    with st.sidebar.expander("Conversions", expanded=False):
         conv_new = number_input_state(
             "New-subscriber premium conversion",
             min_value=0.0,
@@ -1557,6 +1562,17 @@ def sidebar_inputs() -> SimulationInputs:
             step=0.0001,
             format="%0.4f",
             key="conv_ongoing",
+        )
+
+    with st.sidebar.expander("Downgrades", expanded=False):
+        downgrade_to_free = number_input_state(
+            "Paid downgrades to free",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=float(_get_state("downgrade_to_free", 0.0)),
+            step=0.001,
+            format="%0.3f",
+            key="downgrade_to_free",
         )
 
     def _spend_controls(prefix: str, label_prefix: str, default_index: int = 1) -> tuple[AdSpendSchedule, int | None]:
@@ -1907,21 +1923,7 @@ def sidebar_inputs() -> SimulationInputs:
         carrying_capacity = k_float
     organic_from_fit = float(_r_now[-1]) if (_r_now and len(_r_now) > 0) else float(organic_growth)
 
-    capacity_free = number_input_state(
-        "Free carrying capacity (optional)",
-        min_value=0.0,
-        default_value=float(_get_state("carrying_capacity_free", 0.0)),
-        step=100.0,
-        key="carrying_capacity_free",
-    )
-    capacity_premium = number_input_state(
-        "Premium carrying capacity (optional)",
-        min_value=0.0,
-        default_value=float(_get_state("carrying_capacity_premium", 0.0)),
-        step=100.0,
-        key="carrying_capacity_premium",
-    )
-
+    # Process carrying capacity values (inputs now in sidebar Free/Premium parameters expanders)
     carrying_capacity_free = float(capacity_free) if float(capacity_free or 0.0) > 0 else None
     carrying_capacity_premium = float(capacity_premium) if float(capacity_premium or 0.0) > 0 else None
 
