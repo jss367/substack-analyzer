@@ -1671,22 +1671,6 @@ def sidebar_inputs() -> SimulationInputs:
 
         return ad_schedule, one_time_trigger_idx
 
-    def _spend_preview(ad_schedule: AdSpendSchedule, trigger_idx: int | None, label: str) -> None:
-        with st.sidebar.expander(f"Ad spend preview ({label})", expanded=False):
-            horizon_idx = max(int(horizon) - 1, 0)
-            candidates = [0, 11, 23, 35, 59, horizon_idx]
-            preview_months = sorted({min(max(m, 0), horizon_idx) for m in candidates})
-            if trigger_idx is not None and horizon_idx >= 0:
-                preview_months = sorted(
-                    set(preview_months)
-                    | {min(max(trigger_idx, 0), horizon_idx)}
-                )
-            preview_rows = {
-                f"Month {m + 1}": format_currency(float(ad_schedule.get_spend_for_month(m)))
-                for m in preview_months
-            }
-            st.write("Representative monthly ad spend:", preview_rows)
-
     with st.sidebar.expander("Advertising", expanded=True):
         st.caption("Configure ad spend budget and allocation.")
 
@@ -1714,8 +1698,6 @@ def sidebar_inputs() -> SimulationInputs:
 
         ad_schedule = split_schedule(total_ad_schedule, free_pct)
         premium_ad_schedule = split_schedule(total_ad_schedule, premium_pct)
-
-        _spend_preview(total_ad_schedule, one_time_trigger_idx, "Total budget")
 
         cac = number_input_state(
             "Cost per new free subscriber (CAC)",
