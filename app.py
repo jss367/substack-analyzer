@@ -2111,24 +2111,29 @@ def render_charts(df: pd.DataFrame) -> None:
         # Show free + premium + premium % as dashed line
         chart_df["premium_pct"] = (chart_df["premium_subscribers"] / (chart_df["free_subscribers"] + chart_df["premium_subscribers"])) * 100
 
-        base = alt.Chart(chart_df).encode(
+        # Reshape data for free and premium to share the same axis
+        subscribers_df = pd.DataFrame({
+            "month_index": list(chart_df["month_index"]) + list(chart_df["month_index"]),
+            "subscribers": list(chart_df["free_subscribers"]) + list(chart_df["premium_subscribers"]),
+            "type": ["Free"] * len(chart_df) + ["Premium"] * len(chart_df),
+        })
+
+        # Subscriber counts on left axis (free + premium)
+        base_subscribers = alt.Chart(subscribers_df).mark_line(strokeWidth=2).encode(
             x=alt.X("month_index:Q", title="Month"),
+            y=alt.Y("subscribers:Q", title="Subscriber count"),
+            color=alt.Color("type:N", scale=alt.Scale(domain=["Free", "Premium"], range=["#1f77b4", "#ff7f0e"]), legend=alt.Legend(title=None)),
+            tooltip=["month_index:Q", "type:N", "subscribers:Q"],
         )
 
-        free_line = base.mark_line(color="#1f77b4", strokeWidth=2).encode(
-            y=alt.Y("free_subscribers:Q", title="Subscriber count"),
-            tooltip=["month_index:Q", "free_subscribers:Q"],
-        )
-        premium_line = base.mark_line(color="#ff7f0e", strokeWidth=2).encode(
-            y=alt.Y("premium_subscribers:Q"),
-            tooltip=["month_index:Q", "premium_subscribers:Q"],
-        )
-        pct_line = base.mark_line(color="#ff7f0e", strokeDash=[5, 5], strokeWidth=2).encode(
+        # Premium % on right axis (dashed line)
+        pct_line = alt.Chart(chart_df).mark_line(color="#ff7f0e", strokeDash=[5, 5], strokeWidth=2).encode(
+            x=alt.X("month_index:Q", title="Month"),
             y=alt.Y("premium_pct:Q", title="Premium % of total", scale=alt.Scale(domain=[0, 100])),
-            tooltip=["month_index:Q", alt.Tooltip("premium_pct:Q", format=".2f")],
+            tooltip=["month_index:Q", alt.Tooltip("premium_pct:Q", format=".2f", title="Premium %")],
         )
 
-        chart = alt.layer(free_line, premium_line, pct_line).resolve_scale(y="independent").properties(height=400)
+        chart = alt.layer(base_subscribers, pct_line).resolve_scale(y="independent").properties(height=400)
 
     st.altair_chart(chart, use_container_width=True)
 
