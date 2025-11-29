@@ -32,8 +32,8 @@ from substack_analyzer.changepoints import (
     run_detection,
 )
 from substack_analyzer.detection import compute_segment_slopes, slope_around
-from substack_analyzer.model import simulate_growth
 from substack_analyzer.faq import FAQ_ITEMS
+from substack_analyzer.model import simulate_growth
 from substack_analyzer.persistence import (
     apply_phase_one_json,
     apply_session_bundle,
@@ -354,7 +354,7 @@ def _normalize_month_end(dates: list[Any]) -> list[pd.Timestamp]:
 
 def _dates_to_breakpoint_indices(dates: list[pd.Timestamp], index: pd.DatetimeIndex) -> list[int]:
     """Map month-end dates to integer indices into the given monthly index."""
-    if dates is None or len(dates) == 0:
+    if not dates:
         return []
     idxs: list[int] = []
     for d in _normalize_month_end(dates):
@@ -713,7 +713,7 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                             effects=["Persistent"],
                             components=["rate", "mixed"],
                         )
-                        try:
+                        with suppress(Exception):
                             logger.info(
                                 "Classifier filtered (Persistent & rate/mixed): %s",
                                 [
@@ -725,8 +725,6 @@ def events_editor(plot_df: pd.DataFrame, target_col: str | None) -> None:
                                     for b in seg_effects
                                 ],
                             )
-                        except Exception:
-                            pass
 
                         if detect_mode == "both":
                             # Merge by month-end to avoid double-counting near-duplicate breaks across Total/Paid
@@ -955,7 +953,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     "Use dual-series fitting (fit free and premium separately)",
                     value=True,
                     help="When enabled, fits both free and premium series independently "
-                         "and infers conversion/churn rates from their relationship.",
+                    "and infers conversion/churn rates from their relationship.",
                 )
 
             # ----- optional exogenous regressor -----
@@ -966,6 +964,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
             # ----- fit -----
             if use_dual_fit and paid_series_for_fit is not None:
                 from substack_analyzer.calibration import fit_dual_series
+
                 dual_fit = fit_dual_series(
                     free_series=fit_series_source,
                     premium_series=paid_series_for_fit,
@@ -1015,8 +1014,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     st.session_state["modelfit_r_last_default"] = last_fit_r
                     if "modelfit_r_last_input" in st.session_state:
                         logger.info(
-                            "Dropping modelfit_r_last_input after refitting; "
-                            "last_fit_r=%s, previous_widget=%s",
+                            "Dropping modelfit_r_last_input after refitting; " "last_fit_r=%s, previous_widget=%s",
                             last_fit_r,
                             st.session_state.get("modelfit_r_last_input"),
                         )
@@ -1039,8 +1037,7 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                     )
                 else:
                     logger.info(
-                        "No stored modelfit_r_last_input while seeding existing_r; "
-                        "last_existing_r=%s",
+                        "No stored modelfit_r_last_input while seeding existing_r; " "last_existing_r=%s",
                         last_existing_r,
                     )
                 st.session_state.pop("modelfit_r_last_input", None)
@@ -1142,20 +1139,29 @@ def quick_fit_ui(plot_df: pd.DataFrame, breakpoints: list[int]) -> None:
                 with col1:
                     st.metric(
                         "Conversion Rate (monthly)",
-                        f"{dual_fit.inferred_conversion_rate:.2%}"
-                        if dual_fit.inferred_conversion_rate is not None else "N/A"
+                        (
+                            f"{dual_fit.inferred_conversion_rate:.2%}"
+                            if dual_fit.inferred_conversion_rate is not None
+                            else "N/A"
+                        ),
                     )
                 with col2:
                     st.metric(
                         "Free Churn Rate (monthly)",
-                        f"{dual_fit.inferred_churn_rate_free:.2%}"
-                        if dual_fit.inferred_churn_rate_free is not None else "N/A"
+                        (
+                            f"{dual_fit.inferred_churn_rate_free:.2%}"
+                            if dual_fit.inferred_churn_rate_free is not None
+                            else "N/A"
+                        ),
                     )
                 with col3:
                     st.metric(
                         "Premium Churn Rate (monthly)",
-                        f"{dual_fit.inferred_churn_rate_premium:.2%}"
-                        if dual_fit.inferred_churn_rate_premium is not None else "N/A"
+                        (
+                            f"{dual_fit.inferred_churn_rate_premium:.2%}"
+                            if dual_fit.inferred_churn_rate_premium is not None
+                            else "N/A"
+                        ),
                     )
 
                 st.info(
@@ -1490,8 +1496,7 @@ def sidebar_inputs() -> SimulationInputs:
         inferred_churn_premium = dual_fit.inferred_churn_rate_premium
 
         st.sidebar.info(
-            "Using inferred parameters from Phase 1 dual-series fit as defaults. "
-            "You can override them below."
+            "Using inferred parameters from Phase 1 dual-series fit as defaults. " "You can override them below."
         )
 
     with st.sidebar.expander("Free parameters", expanded=True):
@@ -1517,7 +1522,11 @@ def sidebar_inputs() -> SimulationInputs:
             "Monthly churn (free)",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(inferred_churn_free) if inferred_churn_free is not None else float(_get_state("churn_free", 0.015)),
+            default_value=(
+                float(inferred_churn_free)
+                if inferred_churn_free is not None
+                else float(_get_state("churn_free", 0.015))
+            ),
             step=0.001,
             format="%0.3f",
             key="churn_free",
@@ -1526,7 +1535,7 @@ def sidebar_inputs() -> SimulationInputs:
         # Smart default for carrying capacity:
         # 1. Use fitted K from Phase 1 if available
         # 2. Otherwise, use 15x starting subscribers (minimum 50k)
-        smart_default_free = fitted_k if fitted_k else max(float(start_free) * 15, 50000.0)
+        smart_default_free = fitted_k or max(float(start_free) * 15, 50000.0)
         capacity_free_default = float(_get_state("carrying_capacity_free", smart_default_free))
         capacity_free = number_input_state(
             "Carrying capacity (free)",
@@ -1550,7 +1559,11 @@ def sidebar_inputs() -> SimulationInputs:
             "Monthly churn (premium)",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(inferred_churn_premium) if inferred_churn_premium is not None else float(_get_state("churn_prem", 0.01)),
+            default_value=(
+                float(inferred_churn_premium)
+                if inferred_churn_premium is not None
+                else float(_get_state("churn_prem", 0.01))
+            ),
             step=0.001,
             format="%0.3f",
             key="churn_prem",
@@ -1575,7 +1588,9 @@ def sidebar_inputs() -> SimulationInputs:
             "New-subscriber premium conversion",
             min_value=0.0,
             max_value=1.0,
-            default_value=float(inferred_conversion) if inferred_conversion is not None else float(_get_state("conv_new", 0.02)),
+            default_value=(
+                float(inferred_conversion) if inferred_conversion is not None else float(_get_state("conv_new", 0.02))
+            ),
             step=0.001,
             format="%0.3f",
             key="conv_new",
@@ -1810,9 +1825,7 @@ def sidebar_inputs() -> SimulationInputs:
                 getattr(fit, "gamma_exog", None),
             )
         if fit is None:
-            st.caption(
-                "No model fit yet. Using starter defaults below—run Model fit on the Estimators tab when ready."
-            )
+            st.caption("No model fit yet. Using starter defaults below—run Model fit on the Estimators tab when ready.")
         try:
             # Note: Carrying capacity is now configured separately for free and premium
             # in the Free/Premium parameters expanders above
@@ -1887,14 +1900,12 @@ def sidebar_inputs() -> SimulationInputs:
         ):
             if last_default is None:
                 logger.info(
-                    "Resetting last segment input because no stored default exists; "
-                    "computed_default=%s",
+                    "Resetting last segment input because no stored default exists; " "computed_default=%s",
                     last_segment_default,
                 )
             else:
                 logger.info(
-                    "Resetting last segment input due to default drift; "
-                    "stored_default=%s, computed_default=%s",
+                    "Resetting last segment input due to default drift; " "stored_default=%s, computed_default=%s",
                     last_default,
                     last_segment_default,
                 )
@@ -2088,28 +2099,44 @@ def render_charts(df: pd.DataFrame) -> None:
 
     elif chart_mode == "% view":
         # Show free + premium + premium % as dashed line
-        chart_df["premium_pct"] = (chart_df["premium_subscribers"] / (chart_df["free_subscribers"] + chart_df["premium_subscribers"])) * 100
+        chart_df["premium_pct"] = (
+            chart_df["premium_subscribers"] / (chart_df["free_subscribers"] + chart_df["premium_subscribers"])
+        ) * 100
 
         # Reshape data for free and premium to share the same axis
-        subscribers_df = pd.DataFrame({
-            "month_index": list(chart_df["month_index"]) + list(chart_df["month_index"]),
-            "subscribers": list(chart_df["free_subscribers"]) + list(chart_df["premium_subscribers"]),
-            "type": ["Free"] * len(chart_df) + ["Premium"] * len(chart_df),
-        })
+        subscribers_df = pd.DataFrame(
+            {
+                "month_index": list(chart_df["month_index"]) + list(chart_df["month_index"]),
+                "subscribers": list(chart_df["free_subscribers"]) + list(chart_df["premium_subscribers"]),
+                "type": ["Free"] * len(chart_df) + ["Premium"] * len(chart_df),
+            }
+        )
 
         # Subscriber counts on left axis (free + premium)
-        base_subscribers = alt.Chart(subscribers_df).mark_line(strokeWidth=2).encode(
-            x=alt.X("month_index:Q", title="Month"),
-            y=alt.Y("subscribers:Q", title="Subscriber count"),
-            color=alt.Color("type:N", scale=alt.Scale(domain=["Free", "Premium"], range=["#1f77b4", "#ff7f0e"]), legend=alt.Legend(title=None)),
-            tooltip=["month_index:Q", "type:N", "subscribers:Q"],
+        base_subscribers = (
+            alt.Chart(subscribers_df)
+            .mark_line(strokeWidth=2)
+            .encode(
+                x=alt.X("month_index:Q", title="Month"),
+                y=alt.Y("subscribers:Q", title="Subscriber count"),
+                color=alt.Color(
+                    "type:N",
+                    scale=alt.Scale(domain=["Free", "Premium"], range=["#1f77b4", "#ff7f0e"]),
+                    legend=alt.Legend(title=None),
+                ),
+                tooltip=["month_index:Q", "type:N", "subscribers:Q"],
+            )
         )
 
         # Premium % on right axis (dashed line)
-        pct_line = alt.Chart(chart_df).mark_line(color="#ff7f0e", strokeDash=[5, 5], strokeWidth=2).encode(
-            x=alt.X("month_index:Q", title="Month"),
-            y=alt.Y("premium_pct:Q", title="Premium % of total", scale=alt.Scale(domain=[0, 100])),
-            tooltip=["month_index:Q", alt.Tooltip("premium_pct:Q", format=".2f", title="Premium %")],
+        pct_line = (
+            alt.Chart(chart_df)
+            .mark_line(color="#ff7f0e", strokeDash=[5, 5], strokeWidth=2)
+            .encode(
+                x=alt.X("month_index:Q", title="Month"),
+                y=alt.Y("premium_pct:Q", title="Premium % of total", scale=alt.Scale(domain=[0, 100])),
+                tooltip=["month_index:Q", alt.Tooltip("premium_pct:Q", format=".2f", title="Premium %")],
+            )
         )
 
         chart = alt.layer(base_subscribers, pct_line).resolve_scale(y="independent").properties(height=400)
