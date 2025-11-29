@@ -1,6 +1,6 @@
 [project]
 name = "substack-analyzer"
-version = "0.3.2"
+version = "1.0.0"
 requires-python = ">=3.12,<=3.14"
 description = "Substack analyzer app"
 readme = "README.md"
