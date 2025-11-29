@@ -2015,14 +2015,9 @@ def render_kpis(df: pd.DataFrame) -> None:
     payback_month = next((i + 1 for i, c in enumerate(df.cumulative_net_profit) if c > 0), math.nan)
     col8.metric("Payback month (cumulative)", "—" if math.isnan(payback_month) else str(int(payback_month)))
 
-    col9, col10, col11, _ = st.columns(4)
+    col9, _, _, _ = st.columns(4)
     total_ad_spend = df.ad_spend.sum()
-    free_ad_spend = df.ad_spend_free.sum()
-    premium_ad_spend = df.ad_spend_premium.sum()
-    free_pct_actual = 0.0 if total_ad_spend == 0 else (free_ad_spend / total_ad_spend * 100)
     col9.metric("Total ad spend", format_currency(total_ad_spend))
-    col10.metric("Free ad spend", format_currency(free_ad_spend))
-    col11.metric("Premium ad spend", format_currency(premium_ad_spend))
 
 
 def render_charts(df: pd.DataFrame) -> None:
