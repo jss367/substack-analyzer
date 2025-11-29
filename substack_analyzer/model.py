@@ -96,14 +96,14 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
             if input_params.carrying_capacity_premium is None
             else float(input_params.carrying_capacity_premium)
         )
+        # Logistic growth damping: (1 - N/K) creates smooth S-curve
+        # but we also maintain equilibrium near K by replacing churn
         capacity_multiplier_free = 1.0
-        free_capacity_denominator = free_subs
-        free_capacity_gap = float("inf")
+        carrying_capacity_free_active = carrying_capacity_free
         if carrying_capacity_free > 0:
             use_shared_free = input_params.carrying_capacity_free is None and carrying_capacity_shared > 0
             free_capacity_denominator = free_subs + premium_subs if use_shared_free else free_subs
-            free_capacity_gap = max(0.0, carrying_capacity_free - free_capacity_denominator)
-            capacity_multiplier_free = max(0.0, 1.0 - free_capacity_denominator / carrying_capacity_free)
+            capacity_multiplier_free = max(0.0, 1.0 - free_capacity_denominator / carrying_capacity_free_active)
 
         # Organic growth (before capacity adjustment)
         new_free_organic_raw = free_subs * input_params.organic_monthly_growth_rate
@@ -141,19 +141,35 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
         paid_new_free = paid_new_free_base * _diminishing_multiplier(adstock_free)
         paid_new_premium = paid_new_premium_base * _diminishing_multiplier(adstock_premium)
 
-        # Apply capacity adjustment while ensuring churn replacement near the ceiling
+        # Apply logistic damping with equilibrium maintenance near capacity
+        # Smooth S-curve growth that maintains K despite churn
         new_free_raw_total = new_free_organic_raw + paid_new_free
-        overall_multiplier = 1.0 if new_free_raw_total > 0 else 0.0
-        if carrying_capacity_free > 0 and new_free_raw_total > 0:
-            base_fill_free = min(new_free_raw_total, free_capacity_gap)
-            excess_new_free = new_free_raw_total - base_fill_free
-            adjusted_total_new_free = base_fill_free + excess_new_free * capacity_multiplier_free
-            overall_multiplier = (
-                adjusted_total_new_free / new_free_raw_total if new_free_raw_total > 0 else 0.0
-            )
+        if carrying_capacity_free_active > 0 and new_free_raw_total > 0:
+            # Gap to capacity (accounts for churn, maintains equilibrium)
+            use_shared_free = input_params.carrying_capacity_free is None and carrying_capacity_shared > 0
+            free_capacity_denominator = free_subs + premium_subs if use_shared_free else free_subs
+            free_capacity_gap = max(0.0, carrying_capacity_free_active - free_capacity_denominator)
 
-        new_free_organic = new_free_organic_raw * overall_multiplier
-        new_free_paid = paid_new_free * overall_multiplier
+            # Fill gap first (maintains equilibrium), then apply damping to excess
+            base_fill_free = min(new_free_raw_total, free_capacity_gap)
+            excess_new_free = max(0.0, new_free_raw_total - base_fill_free)
+
+            # Calculate damping based on position AFTER filling gap (prevents overshoot)
+            free_after_gap = free_capacity_denominator + base_fill_free
+            capacity_multiplier_free_adjusted = max(0.0, 1.0 - free_after_gap / carrying_capacity_free_active)
+
+            # Damped excess creates smooth approach to K (no hard stop)
+            damped_excess = excess_new_free * capacity_multiplier_free_adjusted
+            adjusted_total = base_fill_free + damped_excess
+
+            # Proportionally scale organic and paid
+            scale_factor = adjusted_total / new_free_raw_total if new_free_raw_total > 0 else 0.0
+            new_free_organic = new_free_organic_raw * scale_factor
+            new_free_paid = paid_new_free * scale_factor
+        else:
+            # No capacity constraint
+            new_free_organic = new_free_organic_raw
+            new_free_paid = paid_new_free
 
         # Add new free
         new_free_total = new_free_organic + new_free_paid
@@ -165,18 +181,29 @@ def simulate_growth(input_params: SimulationInputs) -> SimulationResult:
 
         # Premium paid acquisition (direct to premium)
         premium_inflow_raw = convert_from_new_raw + convert_from_existing_raw + paid_new_premium
-        premium_multiplier = 1.0 if premium_inflow_raw > 0 else 0.0
+
+        # Apply logistic damping with equilibrium maintenance for premium
         if carrying_capacity_premium > 0 and premium_inflow_raw > 0:
-            capacity_gap_premium = max(0.0, carrying_capacity_premium - premium_subs)
-            base_fill_premium = min(premium_inflow_raw, capacity_gap_premium)
-            excess_premium = premium_inflow_raw - base_fill_premium
-            capacity_multiplier_premium = max(
-                0.0, 1.0 - (premium_subs + base_fill_premium) / carrying_capacity_premium
-            )
-            adjusted_total_premium = base_fill_premium + excess_premium * capacity_multiplier_premium
-            premium_multiplier = (
-                adjusted_total_premium / premium_inflow_raw if premium_inflow_raw > 0 else 0.0
-            )
+            # Gap to capacity
+            premium_capacity_gap = max(0.0, carrying_capacity_premium - premium_subs)
+
+            # Fill gap first (maintains equilibrium), then apply damping to excess
+            base_fill_premium = min(premium_inflow_raw, premium_capacity_gap)
+            excess_premium = max(0.0, premium_inflow_raw - base_fill_premium)
+
+            # Calculate damping based on position AFTER filling gap (prevents overshoot)
+            premium_after_gap = premium_subs + base_fill_premium
+            capacity_multiplier_premium = max(0.0, 1.0 - premium_after_gap / carrying_capacity_premium)
+
+            # Damped excess creates smooth approach to K
+            damped_excess_premium = excess_premium * capacity_multiplier_premium
+            adjusted_total_premium = base_fill_premium + damped_excess_premium
+
+            # Proportionally scale all premium inflows
+            premium_multiplier = adjusted_total_premium / premium_inflow_raw if premium_inflow_raw > 0 else 0.0
+        else:
+            # No capacity constraint
+            premium_multiplier = 1.0
 
         convert_from_new = convert_from_new_raw * premium_multiplier
         convert_from_existing = convert_from_existing_raw * premium_multiplier
