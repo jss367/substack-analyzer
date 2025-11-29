@@ -1685,8 +1685,8 @@ def sidebar_inputs() -> SimulationInputs:
             }
             st.write("Representative monthly ad spend:", preview_rows)
 
-    with st.sidebar.expander("Acquisition", expanded=True):
-        st.caption("Configure total paid acquisition budget and how it's allocated.")
+    with st.sidebar.expander("Advertising", expanded=True):
+        st.caption("Configure ad spend budget and allocation.")
 
         # Single ad spend schedule for total budget
         total_ad_schedule, one_time_trigger_idx = _spend_controls("total", "Total")
