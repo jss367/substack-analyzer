@@ -2027,14 +2027,112 @@ def render_kpis(df: pd.DataFrame) -> None:
 
 def render_charts(df: pd.DataFrame) -> None:
     st.subheader("Subscribers over time")
-    st.line_chart(
-        df[["free_subscribers", "premium_subscribers"]].rename(
-            columns={
-                "free_subscribers": "Free",
-                "premium_subscribers": "Premium",
-            }
+
+    # Chart mode controls
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        chart_mode = st.radio(
+            "Chart mode",
+            options=["Linear", "Log scale", "Dual-axis", "% view"],
+            index=1,  # Default to log scale
+            horizontal=True,
+            key="subscribers_chart_mode",
         )
-    )
+
+    # Smart scaling option for dual-axis mode
+    smart_scaling = False
+    if chart_mode == "Dual-axis":
+        with col2:
+            smart_scaling = st.checkbox(
+                "Smart scaling",
+                value=True,
+                key="subscribers_smart_scaling",
+                help="Auto-zoom each axis to min/max of its series for clearer trends",
+            )
+
+    # Prepare data
+    chart_df = df.reset_index()
+    chart_df["month_index"] = range(len(chart_df))
+
+    # Build chart based on mode
+    if chart_mode == "Linear":
+        # Single axis, linear scale
+        base = alt.Chart(chart_df).encode(
+            x=alt.X("month_index:Q", title="Month"),
+        )
+        free_line = base.mark_line(color="#1f77b4").encode(
+            y=alt.Y("free_subscribers:Q", title="Subscribers"),
+            tooltip=["month_index:Q", "free_subscribers:Q"],
+        )
+        premium_line = base.mark_line(color="#ff7f0e").encode(
+            y=alt.Y("premium_subscribers:Q"),
+            tooltip=["month_index:Q", "premium_subscribers:Q"],
+        )
+        chart = (free_line + premium_line).properties(height=400)
+
+    elif chart_mode == "Log scale":
+        # Single axis, log scale (default)
+        base = alt.Chart(chart_df).encode(
+            x=alt.X("month_index:Q", title="Month"),
+        )
+        free_line = base.mark_line(color="#1f77b4").encode(
+            y=alt.Y("free_subscribers:Q", title="Subscribers (log scale)", scale=alt.Scale(type="log")),
+            tooltip=["month_index:Q", "free_subscribers:Q"],
+        )
+        premium_line = base.mark_line(color="#ff7f0e").encode(
+            y=alt.Y("premium_subscribers:Q", scale=alt.Scale(type="log")),
+            tooltip=["month_index:Q", "premium_subscribers:Q"],
+        )
+        chart = (free_line + premium_line).properties(height=400)
+
+    elif chart_mode == "Dual-axis":
+        # Dual axes: free (left), premium (right)
+        base = alt.Chart(chart_df).encode(
+            x=alt.X("month_index:Q", title="Month"),
+        )
+
+        # Determine Y-axis domains
+        if smart_scaling:
+            free_domain = [chart_df["free_subscribers"].min(), chart_df["free_subscribers"].max()]
+            premium_domain = [chart_df["premium_subscribers"].min(), chart_df["premium_subscribers"].max()]
+        else:
+            free_domain = [0, chart_df["free_subscribers"].max()]
+            premium_domain = [0, chart_df["premium_subscribers"].max()]
+
+        free_line = base.mark_line(color="#1f77b4", strokeWidth=2).encode(
+            y=alt.Y("free_subscribers:Q", title="Free subscribers", scale=alt.Scale(domain=free_domain)),
+            tooltip=["month_index:Q", "free_subscribers:Q"],
+        )
+        premium_line = base.mark_line(color="#ff7f0e", strokeWidth=2).encode(
+            y=alt.Y("premium_subscribers:Q", title="Premium subscribers", scale=alt.Scale(domain=premium_domain)),
+            tooltip=["month_index:Q", "premium_subscribers:Q"],
+        )
+        chart = alt.layer(free_line, premium_line).resolve_scale(y="independent").properties(height=400)
+
+    elif chart_mode == "% view":
+        # Show free + premium + premium % as dashed line
+        chart_df["premium_pct"] = (chart_df["premium_subscribers"] / (chart_df["free_subscribers"] + chart_df["premium_subscribers"])) * 100
+
+        base = alt.Chart(chart_df).encode(
+            x=alt.X("month_index:Q", title="Month"),
+        )
+
+        free_line = base.mark_line(color="#1f77b4", strokeWidth=2).encode(
+            y=alt.Y("free_subscribers:Q", title="Subscriber count"),
+            tooltip=["month_index:Q", "free_subscribers:Q"],
+        )
+        premium_line = base.mark_line(color="#ff7f0e", strokeWidth=2).encode(
+            y=alt.Y("premium_subscribers:Q"),
+            tooltip=["month_index:Q", "premium_subscribers:Q"],
+        )
+        pct_line = base.mark_line(color="#ff7f0e", strokeDash=[5, 5], strokeWidth=2).encode(
+            y=alt.Y("premium_pct:Q", title="Premium % of total", scale=alt.Scale(domain=[0, 100])),
+            tooltip=["month_index:Q", alt.Tooltip("premium_pct:Q", format=".2f")],
+        )
+
+        chart = alt.layer(free_line, premium_line, pct_line).resolve_scale(y="independent").properties(height=400)
+
+    st.altair_chart(chart, use_container_width=True)
 
     st.subheader("Revenue and profit")
     st.area_chart(
