@@ -1529,7 +1529,7 @@ def sidebar_inputs() -> SimulationInputs:
         smart_default_free = fitted_k if fitted_k else max(float(start_free) * 15, 50000.0)
         capacity_free_default = float(_get_state("carrying_capacity_free", smart_default_free))
         capacity_free = number_input_state(
-            "Carrying capacity (free) - optional",
+            "Carrying capacity (free)",
             min_value=0.0,
             default_value=capacity_free_default,
             step=100.0,
@@ -1562,7 +1562,7 @@ def sidebar_inputs() -> SimulationInputs:
         smart_default_premium = fitted_k if fitted_k else max(float(start_premium) * 15, 5000.0)
         capacity_premium_default = float(_get_state("carrying_capacity_premium", smart_default_premium))
         capacity_premium = number_input_state(
-            "Carrying capacity (premium) - optional",
+            "Carrying capacity (premium)",
             min_value=0.0,
             default_value=capacity_premium_default,
             step=100.0,
