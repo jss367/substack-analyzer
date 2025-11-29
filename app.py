@@ -1364,12 +1364,12 @@ def metrics_and_apply_ui(all_series: pd.Series | None, paid_series: pd.Series | 
         if net_only:
             st.session_state["churn_free"] = 0.0
             st.session_state["churn_prem"] = 0.0
-        st.session_state["ad_stage1"] = 0.0
-        st.session_state["ad_stage2"] = 0.0
-        st.session_state["ad_const"] = 0.0
-        st.session_state["ad_one_time_amount"] = 0.0
-        st.session_state["ad_one_time_month"] = 1
-        st.session_state["spend_mode_index"] = 1
+        st.session_state["total_ad_stage1"] = 0.0
+        st.session_state["total_ad_stage2"] = 0.0
+        st.session_state["total_ad_const"] = 0.0
+        st.session_state["total_ad_one_time_amount"] = 0.0
+        st.session_state["total_ad_one_time_month"] = 1
+        st.session_state["total_spend_mode_index"] = 1
         st.session_state["conv_new"] = 0.0
         st.session_state["horizon_months"] = 24
         # Ensure the Simulator shows an equation even if model fit wasn't run
