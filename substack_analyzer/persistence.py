@@ -265,12 +265,14 @@ def _records_to_series(records: list[dict[str, Any]] | None) -> pd.Series | None
     if not {"date", "count"}.issubset(df.columns):
         return None
     df = df.assign(date=lambda d: pd.to_datetime(d["date"]))
-    df = df.dropna(subset=["date"]).sort_values("date")
-    s = pd.to_numeric(df["count"], errors="coerce").dropna()
-    if s.empty:
+    # Keep rows where both date and count are valid; ensure alignment after dropna
+    counts = pd.to_numeric(df["count"], errors="coerce")
+    df = df.loc[counts.notna()].dropna(subset=["date"]).copy()
+    if df.empty:
         return None
-    s.index = df["date"].dt.to_period("M").dt.to_timestamp("M")
-    return pd.Series(s.values, index=s.index)
+    df = df.sort_values("date")
+    idx = df["date"].dt.to_period("M").dt.to_timestamp("M")
+    return pd.Series(counts.loc[df.index].astype(float).values, index=idx)
 
 
 def _detect_display_to_code(value: str) -> str:
