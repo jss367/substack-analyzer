@@ -3,6 +3,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import IO
 
+import numpy as np
 import altair as alt
 import pandas as pd
 import streamlit as st
@@ -265,7 +266,7 @@ def compute_estimates(all_series: pd.Series | None, paid_series: pd.Series | Non
         return st.session_state.get(key, default)
 
     def _median_positive(s: pd.Series) -> float:
-        s = s.dropna()
+        s = s.replace([np.inf, -np.inf], np.nan).dropna()
         s = s[s > 0]
         return float(s.median()) if not s.empty else 0.0
 

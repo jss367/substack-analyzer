@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from substack_analyzer.analysis import compute_estimates, derive_adds_churn, read_series
 
@@ -39,3 +40,26 @@ def test_read_series_csv(tmp_path):
 
 
 # end
+
+
+def test_growth_estimates_ignore_infinite_rates_and_keep_finite_median():
+    idx = pd.date_range("2024-01-31", periods=4, freq="ME")
+    # Zero -> positive creates infinity; subsequent finite rates still count.
+    total = pd.Series([0, 10, 20, 30], index=idx)
+    estimates = compute_estimates(total, None, window_months=4)
+    assert estimates["organic_growth"] == 0.75
+
+
+def test_growth_estimates_with_only_nonfinite_or_nonpositive_rates_are_zero():
+    idx = pd.date_range("2024-01-31", periods=3, freq="ME")
+    total = pd.Series([0, 10, 0], index=idx)
+    assert compute_estimates(total, None)["organic_growth"] == 0.0
+
+
+def test_conversion_estimates_ignore_zero_free_population_denominator():
+    idx = pd.date_range("2024-01-31", periods=4, freq="ME")
+    paid = pd.Series([10, 12, 14, 16], index=idx)
+    total = paid + pd.Series([0, 10, 20, 30], index=idx)
+    estimates = compute_estimates(total, paid, window_months=4)
+    assert estimates["organic_growth"] == 0.75
+    assert estimates["conv_ongoing"] == pytest.approx(0.15)
